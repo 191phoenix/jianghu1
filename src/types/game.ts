@@ -89,6 +89,35 @@ export interface BattleResult {
   acquiredInnerSkills: string[] // 本次通关新获得的内功名
 }
 
+/** 战斗中的角色 */
+export interface BattleFighter {
+  id: string
+  name: string
+  stats: Stats
+  hp: number
+  maxHp: number
+  isPlayer: boolean
+  skill: SkillDef | null
+  skillCd: number
+}
+
+export type BattleAction = 'attack' | 'skill'
+export type BattlePhase = 'player' | 'enemy' | 'ended'
+
+/** 战斗状态（手动回合制） */
+export interface BattleState {
+  levelId: string
+  allies: BattleFighter[]
+  enemies: BattleFighter[]
+  round: number
+  actorIdx: number
+  order: string[] // fighter ids，按速度排序
+  phase: BattlePhase
+  log: BattleLine[]
+  result: BattleResult | null
+  pendingAction: BattleAction | null // 玩家选了行动，待选目标
+}
+
 /** 离线挂机收益 */
 export interface OfflineReward {
   duration: number // 实际结算秒数

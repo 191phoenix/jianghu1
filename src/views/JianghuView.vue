@@ -1,31 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { LEVELS, FIRST_LEVEL_ID, getLevel } from '@/config/levelConfig'
-import { computePlayerStats } from '@/logic/statsLogic'
-import { formationHeroes } from '@/logic/heroLogic'
-import BattlePanel from '@/components/BattlePanel.vue'
-import type { BattleResult, LevelDef } from '@/types/game'
+import { LEVELS, FIRST_LEVEL_ID } from '@/config/levelConfig'
+import type { LevelDef } from '@/types/game'
 
 const game = useGameStore()
-
-const result = ref<BattleResult | null>(null)
-const battleAllies = ref<{ name: string; hp: number }[]>([])
-const battleEnemies = ref<{ name: string; hp: number }[]>([])
 
 function isUnlocked(levelId: string): boolean {
   if (levelId === FIRST_LEVEL_ID) return true
   return game.player.clearedLevelIds.includes(levelId) || game.player.currentLevelId === levelId
-}
-
-function challenge(levelId: string) {
-  const level = getLevel(levelId)
-  if (!level) return
-  const allies = [{ name: game.player.name, hp: computePlayerStats(game.player).hp }]
-  for (const h of formationHeroes(game.player)) allies.push({ name: h.name, hp: h.stats.hp })
-  battleAllies.value = allies
-  battleEnemies.value = level.enemies.map((e) => ({ name: e.name, hp: e.stats.hp }))
-  result.value = game.challengeLevel(levelId)
 }
 
 const CHAPTER_LABEL = ['一', '二', '三', '四', '五']
@@ -42,6 +25,7 @@ const chapters = computed(() => {
 <template>
   <div class="space-y-3 p-4">
     <h1 class="text-2xl text-gold">江湖</h1>
+    <p class="text-xs text-muted">点挑战进入回合战斗，手动选普攻 / 技能 / 目标。</p>
 
     <div v-for="[ch, levels] in chapters" :key="ch" class="space-y-1">
       <div class="text-sm text-gold">第{{ CHAPTER_LABEL[ch - 1] || ch }}章</div>
@@ -63,14 +47,12 @@ const chapters = computed(() => {
           <button
             v-if="isUnlocked(lvl.id)"
             class="rounded bg-primary px-3 py-1 text-primary-fg"
-            @click="challenge(lvl.id)"
+            @click="game.startBattle(lvl.id)"
           >
             挑战
           </button>
         </div>
       </div>
     </div>
-
-    <BattlePanel v-if="result" :result="result" :allies="battleAllies" :enemies="battleEnemies" />
   </div>
 </template>

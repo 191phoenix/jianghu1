@@ -1,4 +1,21 @@
-import type { Stats, SkillDef, Enemy, BattleResult, BattleLine } from '@/types/game'
+import type {
+  Stats,
+  SkillDef,
+  Enemy,
+  BattleResult,
+  BattleLine,
+  BattleFighter,
+  BattleAction
+} from '@/types/game'
+
+const MAX_ROUNDS = 30
+export { MAX_ROUNDS }
+
+export interface AllyInput {
+  name: string
+  stats: Stats
+  skill: SkillDef | null
+}
 
 interface Fighter {
   name: string
@@ -8,18 +25,63 @@ interface Fighter {
   skill: SkillDef | null
 }
 
-const MAX_ROUNDS = 30
+/** 计算一次攻击伤害（含暴击判定） */
+export function calcDamage(
+  attacker: Stats,
+  target: Stats,
+  multiplier: number
+): { dmg: number; crit: boolean } {
+  const crit = Math.random() < attacker.critRate
+  const baseDmg = Math.max(attacker.atk - target.def, 1)
+  const dmg = Math.floor(baseDmg * multiplier * (crit ? attacker.critDmg : 1))
+  return { dmg, crit }
+}
 
-export interface AllyInput {
-  name: string
-  stats: Stats
-  skill: SkillDef | null
+let fighterIdCounter = 0
+export function makeFighter(input: AllyInput, isPlayer: boolean): BattleFighter {
+  fighterIdCounter++
+  return {
+    id: `f-${fighterIdCounter}`,
+    name: input.name,
+    stats: input.stats,
+    hp: input.stats.hp,
+    maxHp: input.stats.hp,
+    isPlayer,
+    skill: input.skill,
+    skillCd: 0
+  }
+}
+
+export function makeEnemyFighter(enemy: Enemy, idx: number): BattleFighter {
+  return {
+    id: `e-${enemy.id}-${idx}`,
+    name: enemy.name,
+    stats: enemy.stats,
+    hp: enemy.stats.hp,
+    maxHp: enemy.stats.hp,
+    isPlayer: false,
+    skill: null,
+    skillCd: 0
+  }
+}
+
+/** 敌人 AI：随机选活着的目标，技能可用时概率放 */
+export function aiPickAction(
+  self: BattleFighter,
+  targets: BattleFighter[]
+): { action: BattleAction; targetIdx: number } {
+  const alive = targets
+    .map((t, i) => ({ t, i }))
+    .filter((x) => x.t.hp > 0)
+  if (alive.length === 0) return { action: 'attack', targetIdx: 0 }
+  const pick = alive[Math.floor(Math.random() * alive.length)]
+  const action: BattleAction =
+    self.skill && self.skillCd <= 0 && Math.random() < 0.5 ? 'skill' : 'attack'
+  return { action, targetIdx: pick.i }
 }
 
 /**
- * 自动回合制战斗（阶段 2：多角色 vs 多敌人）
- * 玩家方 = 主角 + 上阵侠客；每回合按速度排序行动，
- * 各自的技能按 every-n-rounds 触发，造成 multiplier 倍伤害。
+ * 自动回合制战斗（保留用于以后"扫荡"；当前挑战用手动战斗）
  */
 export function runBattle(allies: AllyInput[], enemies: Enemy[]): BattleResult {
   const allyFighters: Fighter[] = allies.map((a) => ({
@@ -58,9 +120,7 @@ export function runBattle(allies: AllyInput[], enemies: Enemy[]): BattleResult {
         skillName = f.skill.name
       }
 
-      const crit = Math.random() < f.stats.critRate
-      const baseDmg = Math.max(f.stats.atk - target.stats.def, 1)
-      const dmg = Math.floor(baseDmg * multiplier * (crit ? f.stats.critDmg : 1))
+      const { dmg, crit } = calcDamage(f.stats, target.stats, multiplier)
       target.hp -= dmg
       log.push({ round, attacker: f.name, target: target.name, dmg, crit, skillName })
 
@@ -71,5 +131,15 @@ export function runBattle(allies: AllyInput[], enemies: Enemy[]): BattleResult {
 
   const win = allyFighters.some((a) => a.hp > 0) && foes.every((fo) => fo.hp <= 0)
   const expGained = win ? enemies.reduce((s, e) => s + e.expReward, 0) : 0
-  return { win, rounds: round, log, expGained, drops: [], acquiredHeroes: [], stonesGained: 0, silverGained: 0, acquiredInnerSkills: [] }
+  return {
+    win,
+    rounds: round,
+    log,
+    expGained,
+    drops: [],
+    acquiredHeroes: [],
+    stonesGained: 0,
+    silverGained: 0,
+    acquiredInnerSkills: []
+  }
 }

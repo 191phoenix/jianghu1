@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import AppTabBar from '@/components/AppTabBar.vue'
+import BattleView from '@/views/BattleView.vue'
 import { useGameStore } from '@/stores/gameStore'
 
 const game = useGameStore()
 
 onMounted(() => {
-  // 兼容旧存档 + 结算离线挂机收益
   game.normalize()
   game.checkOffline()
 })
@@ -18,5 +18,6 @@ onMounted(() => {
       <RouterView />
     </main>
     <AppTabBar />
+    <BattleView />
   </div>
 </template>

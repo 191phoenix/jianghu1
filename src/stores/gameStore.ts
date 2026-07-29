@@ -5,13 +5,14 @@ import { FIRST_LEVEL_ID, getLevel, nextLevelId } from '@/config/levelConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
 import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE } from '@/config/shopConfig'
 import { computePlayerStats } from '@/logic/statsLogic'
-import { runBattle, type AllyInput } from '@/logic/battleLogic'
+import type { AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
 import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost } from '@/logic/equipmentLogic'
 import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
 import { settleOffline } from '@/logic/offlineLogic'
+import { useBattleStore } from './battleStore'
 import { rollShopItems } from '@/logic/shopLogic'
 import { TASKS, isTaskDone } from '@/logic/taskLogic'
 
@@ -185,10 +186,10 @@ export const useGameStore = defineStore('game', {
       this.player.lastActiveTime = Date.now()
     },
 
-    challengeLevel(levelId: string): BattleResult | null {
+    /** 开始一场手动战斗 */
+    startBattle(levelId: string) {
       const level = getLevel(levelId)
-      if (!level) return null
-
+      if (!level) return
       const allies: AllyInput[] = [
         { name: this.player.name, stats: computePlayerStats(this.player), skill: this.sectInfo.skill }
       ]
@@ -197,11 +198,17 @@ export const useGameStore = defineStore('game', {
         const eq = this.player.heroEquipped[h.id] || null
         allies.push({ name: h.name, stats: computeHeroStats(h, lvl, eq), skill: h.skill })
       }
+      useBattleStore().initBattle(levelId, allies, level.enemies)
+    },
 
-      const result = runBattle(allies, level.enemies)
+    /** 战斗结束后结算（填 result 并发放奖励） */
+    settleBattle(levelId: string, result: BattleResult): BattleResult {
+      const level = getLevel(levelId)
+      if (!level) return result
       if (result.win) {
         const { expBonus } = talentBonus(this.player.talents)
-        const expGain = Math.floor(result.expGained * (1 + expBonus))
+        const baseExp = level.enemies.reduce((s, e) => s + e.expReward, 0)
+        const expGain = Math.floor(baseExp * (1 + expBonus))
         this.player.exp += expGain
         result.expGained = expGain
         while (this.player.exp >= expToNext(this.player.level)) {
@@ -241,7 +248,7 @@ export const useGameStore = defineStore('game', {
           this.player.clearedLevelIds.push(levelId)
         }
 
-        const heroExpGain = Math.floor(result.expGained * 0.5)
+        const heroExpGain = Math.floor(expGain * 0.5)
         for (const h of formationHeroes(this.player)) {
           let exp = (this.player.heroExp[h.id] || 0) + heroExpGain
           let lvl = this.player.heroLevels[h.id] || 1

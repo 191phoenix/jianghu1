@@ -23,6 +23,16 @@ export interface Equipment {
   star: number // 0-5 强化星数
 }
 
+/** 商店招牌装备（固定目录，一次性购买） */
+export interface ShopGearDef {
+  id: string
+  name: string
+  slot: EquipSlot
+  grade: EquipGrade
+  stats: Partial<Stats>
+  price: number
+}
+
 /** 敌人 */
 export interface Enemy {
   id: string
@@ -51,6 +61,13 @@ export interface SkillDef {
   multiplier: number
 }
 
+/** 门派内功心法（拜入即得的被动加成，独立于通关解锁的内功池） */
+export interface SectInner {
+  name: string
+  desc: string
+  stats: Partial<Stats>
+}
+
 /** 门派 */
 export interface Sect {
   id: string
@@ -58,6 +75,7 @@ export interface Sect {
   desc: string
   skill: SkillDef
   weaponType: WeaponType
+  inner: SectInner
 }
 
 /** 侠客 */
@@ -197,6 +215,9 @@ export interface Player {
   silver: number // 银两
   enhanceCount: number // 强化总次数
   shopItems: Equipment[] // 商店装备摊
+  purchasedShopGear: string[] // 已购招牌装备 id
+  heroSects: Record<string, string> // 侠客 id -> 门派 id（拜入门派）
+  heroUseSectSkill: Record<string, boolean> // 侠客 id -> 是否用门派武功（缺省 true）
   tasksClaimed: string[] // 已领奖的任务 id
   currentLevelId: string
   clearedLevelIds: string[]

@@ -1,7 +1,7 @@
 import type { Player, Stats } from '@/types/game'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
 import { talentBonus } from './talentLogic'
-import { innerSkillBonus } from './innerSkillLogic'
+import { innerSkillBonus, sectInnerBonus } from './innerSkillLogic'
 
 const BASE_STATS: Stats = { hp: 100, atk: 10, def: 5, spd: 10, critRate: 0.05, critDmg: 1.5 }
 
@@ -43,7 +43,14 @@ export function computePlayerStats(player: Player): Stats {
     total[key] += tb.stats[key] ?? 0
   }
 
-  // 内功
+  // 门派内功心法（拜入门派即得）
+  const sb = sectInnerBonus(player.sect)
+  for (const k in sb) {
+    const key = k as keyof Stats
+    total[key] += sb[key] ?? 0
+  }
+
+  // 装备内功（通关解锁池）
   const ib = innerSkillBonus(player)
   for (const k in ib) {
     const key = k as keyof Stats

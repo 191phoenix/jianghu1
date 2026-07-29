@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { GRADE_LABEL } from '@/config/equipmentConfig'
-import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE } from '@/config/shopConfig'
+import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE, SHOP_GEAR } from '@/config/shopConfig'
 import { formatStatsLine } from '@/utils/format'
 import type { Equipment } from '@/types/game'
 
@@ -17,6 +17,9 @@ const GRADE_COLOR: Record<string, string> = {
 }
 function gradeColor(eq: Equipment): string {
   return GRADE_COLOR[eq.grade] ?? 'text-fg'
+}
+function gradeColorOf(grade: string): string {
+  return GRADE_COLOR[grade] ?? 'text-fg'
 }
 </script>
 
@@ -55,6 +58,33 @@ function gradeColor(eq: Equipment): string {
             @click="game.buyShopEquip(idx)"
           >
             买({{ EQUIP_PRICE[eq.grade] }})
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-border bg-surface p-4">
+      <h2 class="mb-2 text-gold">招牌装备</h2>
+      <div class="space-y-1">
+        <div
+          v-for="g in SHOP_GEAR"
+          :key="g.id"
+          class="flex items-center justify-between rounded bg-bg px-2 py-1 text-sm"
+        >
+          <span>
+            <span :class="gradeColorOf(g.grade)">{{ g.name }}</span>
+            <span class="ml-1 text-xs text-muted">
+              ({{ GRADE_LABEL[g.grade] }}) {{ formatStatsLine(g.stats) }}
+            </span>
+          </span>
+          <span v-if="game.player.purchasedShopGear.includes(g.id)" class="text-xs text-muted">已购</span>
+          <button
+            v-else
+            class="rounded bg-primary px-2 py-0.5 text-xs text-primary-fg disabled:opacity-30"
+            :disabled="game.player.silver < g.price"
+            @click="game.buyShopGear(g.id)"
+          >
+            买({{ g.price }})
           </button>
         </div>
       </div>

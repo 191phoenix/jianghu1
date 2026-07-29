@@ -2,11 +2,12 @@
 import { ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { HEROES } from '@/config/heroConfig'
+import { SECTS } from '@/config/sectConfig'
 import { computeHeroStats, heroExpToNext, emptyHeroEquipped } from '@/logic/heroLogic'
 import { GRADE_LABEL, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
 import { WEAPON_TYPE_LABEL, WEAPON_TYPE_SHAPE } from '@/logic/battleLogic'
 import { formatStatsLine } from '@/utils/format'
-import type { Hero, EquipSlot } from '@/types/game'
+import type { Hero, EquipSlot, SkillDef } from '@/types/game'
 
 const game = useGameStore()
 const equipping = ref<string | null>(null) // `${heroId}:${slot}`
@@ -39,7 +40,21 @@ function expPct(id: string) {
   return Math.min(100, (heroExp(id) / heroExpToNext(heroLevel(id))) * 100)
 }
 function statsOf(h: Hero) {
-  return computeHeroStats(h, heroLevel(h.id), heroSlots(h.id))
+  return computeHeroStats(h, heroLevel(h.id), heroSlots(h.id), game.player.heroSects[h.id] || null)
+}
+function heroSectInfo(id: string) {
+  const sid = game.player.heroSects[id]
+  return sid ? SECTS[sid] : undefined
+}
+function useSectSkill(id: string) {
+  return !!heroSectInfo(id) && game.player.heroUseSectSkill[id] !== false
+}
+function currentSkill(h: Hero): SkillDef {
+  const sect = heroSectInfo(h.id)
+  return useSectSkill(h.id) && sect ? sect.skill : h.skill
+}
+function onSectChange(heroId: string, value: string) {
+  game.setHeroSect(heroId, value || null)
 }
 function bagForSlot(slot: EquipSlot) {
   return game.player.bag.filter((eq) => eq.slot === slot)
@@ -93,7 +108,30 @@ function unequip(heroId: string, slot: EquipSlot) {
           </div>
         </div>
         <div class="mt-1 text-xs text-muted">{{ formatStatsLine(statsOf(h)) }}</div>
-        <div class="mt-0.5 text-xs text-gold">【{{ h.skill.name }}】{{ h.skill.desc }}</div>
+        <div class="mt-0.5 text-xs text-gold">【{{ currentSkill(h).name }}】{{ currentSkill(h).desc }}</div>
+
+        <!-- 门派 -->
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-muted">门派：</span>
+          <select
+            class="rounded border border-border bg-bg px-1 py-0.5 text-fg"
+            :value="game.player.heroSects[h.id] || ''"
+            @change="onSectChange(h.id, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">无</option>
+            <option v-for="s in SECTS" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+          <span v-if="heroSectInfo(h.id)" class="text-gold">
+            心法：{{ heroSectInfo(h.id)!.inner.name }}（{{ heroSectInfo(h.id)!.inner.desc }}）
+          </span>
+        </div>
+        <div v-if="heroSectInfo(h.id)" class="mt-1 flex items-center gap-2 text-xs">
+          <span class="text-muted">武功：</span>
+          <button class="text-primary underline" @click="game.toggleHeroSectSkill(h.id)">
+            {{ useSectSkill(h.id) ? heroSectInfo(h.id)!.skill.name : h.skill.name }}（切换）
+          </button>
+          <span class="text-muted">{{ useSectSkill(h.id) ? '门派武功' : '自带武功' }}</span>
+        </div>
 
         <!-- 6 槽装备 -->
         <div class="mt-2 grid grid-cols-3 gap-1">

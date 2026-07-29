@@ -81,6 +81,7 @@ function saveName() {
             兵器：{{ WEAPON_TYPE_LABEL[s.weaponType] }}（{{ WEAPON_TYPE_SHAPE[s.weaponType] }}）
           </div>
           <div class="mt-0.5 text-xs text-gold">【{{ s.skill.name }}】{{ s.skill.desc }}</div>
+          <div class="text-xs text-gold">心法：{{ s.inner.name }}（{{ s.inner.desc }}）</div>
         </div>
       </div>
     </div>

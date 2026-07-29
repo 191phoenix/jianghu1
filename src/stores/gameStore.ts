@@ -3,7 +3,7 @@ import type { Player, BattleResult, Equipment, EquipSlot, OfflineReward, Sect, E
 import { DEFAULT_SECT, SECTS } from '@/config/sectConfig'
 import { FIRST_LEVEL_ID, getLevel, nextLevelId } from '@/config/levelConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
-import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE } from '@/config/shopConfig'
+import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE, SHOP_GEAR } from '@/config/shopConfig'
 import { computePlayerStats } from '@/logic/statsLogic'
 import type { AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
@@ -14,6 +14,7 @@ import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
 import { settleOffline } from '@/logic/offlineLogic'
 import { useBattleStore } from './battleStore'
 import { usePathStore } from './pathStore'
+import { genId } from '@/utils/id'
 import { rollShopItems } from '@/logic/shopLogic'
 import { TASKS, isTaskDone } from '@/logic/taskLogic'
 
@@ -39,6 +40,9 @@ function defaultPlayer(): Player {
     silver: 0,
     enhanceCount: 0,
     shopItems: [],
+    purchasedShopGear: [],
+    heroSects: {},
+    heroUseSectSkill: {},
     tasksClaimed: [],
     currentLevelId: FIRST_LEVEL_ID,
     clearedLevelIds: [],
@@ -128,6 +132,9 @@ export const useGameStore = defineStore('game', {
         silver: p.silver ?? d.silver,
         enhanceCount: p.enhanceCount ?? d.enhanceCount,
         shopItems: p.shopItems ?? d.shopItems,
+        purchasedShopGear: p.purchasedShopGear ?? d.purchasedShopGear,
+        heroSects: p.heroSects ?? d.heroSects,
+        heroUseSectSkill: p.heroUseSectSkill ?? d.heroUseSectSkill,
         tasksClaimed: p.tasksClaimed ?? d.tasksClaimed,
         currentLevelId: p.currentLevelId ?? d.currentLevelId,
         clearedLevelIds: p.clearedLevelIds ?? d.clearedLevelIds,
@@ -218,6 +225,26 @@ export const useGameStore = defineStore('game', {
       if (!eq) return
       slots[slot] = null
       this.player.bag.push(eq)
+      this.touchSave()
+    },
+
+    /** 侠客拜入/退出门派（退出则同步清除武功开关） */
+    setHeroSect(heroId: string, sectId: string | null) {
+      if (!this.player.heroes.includes(heroId)) return
+      if (sectId === null) {
+        delete this.player.heroSects[heroId]
+        delete this.player.heroUseSectSkill[heroId]
+      } else {
+        if (!SECTS[sectId]) return
+        this.player.heroSects[heroId] = sectId
+      }
+      this.touchSave()
+    },
+
+    /** 切换侠客武功来源：门派武功 <-> 自带武功 */
+    toggleHeroSectSkill(heroId: string) {
+      if (!this.player.heroSects[heroId]) return
+      this.player.heroUseSectSkill[heroId] = this.player.heroUseSectSkill[heroId] === false
       this.touchSave()
     },
 
@@ -437,12 +464,15 @@ export const useGameStore = defineStore('game', {
       const h = getHero(key)
       const lvl = this.player.heroLevels[key] || 1
       const eq = this.player.heroEquipped[key] || emptyHeroEquipped()
+      const sectId = this.player.heroSects[key] || null
+      const sect = sectId ? SECTS[sectId] : null
+      const useSectSkill = !!sect && this.player.heroUseSectSkill[key] !== false
       return {
         name: h ? h.name : key,
         stats: h
-          ? computeHeroStats(h, lvl, eq)
+          ? computeHeroStats(h, lvl, eq, sectId)
           : { hp: 1, atk: 1, def: 0, spd: 1, critRate: 0, critDmg: 1 },
-        skill: h ? h.skill : null,
+        skill: h ? (useSectSkill && sect ? sect.skill : h.skill) : null,
         weaponType: h ? h.weaponType : 'fist',
         pos
       }
@@ -493,6 +523,25 @@ export const useGameStore = defineStore('game', {
       this.player.silver -= price
       this.player.shopItems.splice(idx, 1)
       this.player.bag.push(eq)
+      this.touchSave()
+    },
+
+    /** 商店：购买招牌装备（每件仅一次） */
+    buyShopGear(gearId: string) {
+      if (this.player.purchasedShopGear.includes(gearId)) return
+      const gear = SHOP_GEAR.find((g) => g.id === gearId)
+      if (!gear) return
+      if (this.player.silver < gear.price) return
+      this.player.silver -= gear.price
+      this.player.bag.push({
+        id: genId('eq'),
+        name: gear.name,
+        slot: gear.slot,
+        grade: gear.grade,
+        stats: { ...gear.stats },
+        star: 0
+      })
+      this.player.purchasedShopGear.push(gearId)
       this.touchSave()
     },
 

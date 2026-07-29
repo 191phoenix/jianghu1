@@ -1,6 +1,7 @@
 import type { Hero, Player, Stats, Equipment, EquipSlot } from '@/types/game'
 import { HEROES, getHero } from '@/config/heroConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
+import { sectInnerBonus } from './innerSkillLogic'
 
 export { getHero, HEROES }
 
@@ -21,11 +22,12 @@ export function heroExpToNext(level: number): number {
   return Math.floor(80 * Math.pow(level, 1.4))
 }
 
-/** 计算侠客实际属性 = 基础×成长(每级+8%) + 装备(6 槽，按星放大) */
+/** 计算侠客实际属性 = 基础×成长(每级+8%) + 装备(6 槽，按星放大) + 门派内功 */
 export function computeHeroStats(
   hero: Hero,
   level: number,
-  equipped: Record<EquipSlot, Equipment | null>
+  equipped: Record<EquipSlot, Equipment | null>,
+  sectId?: string | null
 ): Stats {
   const growth = 1 + (level - 1) * 0.08
   const stats: Stats = {
@@ -44,6 +46,11 @@ export function computeHeroStats(
       const key = k as keyof Stats
       stats[key] += (eq.stats[key] ?? 0) * mult
     }
+  }
+  const sb = sectInnerBonus(sectId)
+  for (const k in sb) {
+    const key = k as keyof Stats
+    stats[key] += sb[key] ?? 0
   }
   return stats
 }

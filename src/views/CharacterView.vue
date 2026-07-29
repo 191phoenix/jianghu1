@@ -1,10 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
+import { computePlayerStats, baseStatsByLevel } from '@/logic/statsLogic'
+import { expToNext } from '@/logic/growthLogic'
+import { statLabel, formatStatValue } from '@/utils/format'
+import type { Stats } from '@/types/game'
 import SaveManager from '@/components/SaveManager.vue'
 
 const game = useGameStore()
 const nameInput = ref(game.player.name)
+
+const total = computed(() => computePlayerStats(game.player))
+const base = computed(() => baseStatsByLevel(game.player.level))
+const expNeed = computed(() => expToNext(game.player.level))
+const expPct = computed(() => Math.min(100, (game.player.exp / expNeed.value) * 100))
+
+const statRows = computed(() => {
+  const keys: (keyof Stats)[] = ['hp', 'atk', 'def', 'spd', 'critRate', 'critDmg']
+  return keys.map((k) => {
+    const bonus = total.value[k] - base.value[k]
+    return {
+      label: statLabel(k),
+      total: formatStatValue(k, total.value[k]),
+      bonusStr: bonus !== 0 ? '+' + formatStatValue(k, bonus) : ''
+    }
+  })
+})
 
 function saveName() {
   game.setPlayerName(nameInput.value)
@@ -19,13 +40,37 @@ function saveName() {
     <div class="rounded-lg border border-border bg-surface p-4">
       <label class="mb-1 block text-sm text-muted">角色名</label>
       <div class="flex gap-2">
-        <input
-          v-model="nameInput"
-          class="flex-1 rounded border border-border bg-bg px-2 py-1 text-fg"
-        />
+        <input v-model="nameInput" class="flex-1 rounded border border-border bg-bg px-2 py-1 text-fg" />
         <button class="rounded bg-primary px-3 text-primary-fg" @click="saveName">保存</button>
       </div>
-      <p class="mt-2 text-xs text-muted">保存后刷新页面，名字仍在 = 存档生效</p>
+      <div class="mt-3 text-sm text-muted">
+        门派：<span class="text-fg">{{ game.sectInfo.name }}</span> · 等级
+        <span class="text-fg">{{ game.player.level }}</span>
+      </div>
+      <!-- 经验条 -->
+      <div class="mt-2">
+        <div class="mb-1 flex justify-between text-xs text-muted">
+          <span>经验</span>
+          <span>{{ game.player.exp }} / {{ expNeed }}</span>
+        </div>
+        <div class="h-2 overflow-hidden rounded bg-bg">
+          <div class="h-full bg-gold" :style="{ width: expPct + '%' }"></div>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-gold">【{{ game.sectInfo.skill.name }}】{{ game.sectInfo.skill.desc }}</p>
+    </div>
+
+    <div class="rounded-lg border border-border bg-surface p-4">
+      <h2 class="mb-2 text-gold">属性</h2>
+      <div class="space-y-1 text-sm">
+        <div v-for="r in statRows" :key="r.label" class="flex justify-between">
+          <span class="text-muted">{{ r.label }}</span>
+          <span>
+            <span class="text-fg">{{ r.total }}</span>
+            <span v-if="r.bonusStr" class="ml-1 text-green-500">{{ r.bonusStr }}</span>
+          </span>
+        </div>
+      </div>
     </div>
 
     <SaveManager />

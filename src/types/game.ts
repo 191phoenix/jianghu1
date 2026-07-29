@@ -111,6 +111,11 @@ export interface Player {
   innerSkill: string | null // 当前装备的内功 id
   innerSkills: string[] // 已获内功 id
   stones: number // 强化石
+  heroLevels: Record<string, number> // 侠客等级
+  heroExp: Record<string, number> // 侠客经验
+  heroEquipped: Record<string, Equipment | null> // 侠客装备（1 槽）
+  seenEquipment: string[] // 见过的装备 slot-grade
+  seenEnemies: string[] // 见过的敌人 id
   currentLevelId: string
   clearedLevelIds: string[]
   createdAt: number

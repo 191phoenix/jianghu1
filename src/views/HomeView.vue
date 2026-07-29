@@ -18,6 +18,11 @@ const game = useGameStore()
       </div>
     </div>
 
+    <RouterLink to="/codex" class="block rounded-lg border border-border bg-surface p-4">
+      <div class="text-fg">图鉴</div>
+      <div class="text-xs text-muted">装备 / 侠客 / 内功 / 怪物收集进度</div>
+    </RouterLink>
+
     <div v-if="game.pendingOffline" class="rounded-lg border border-gold bg-surface p-4">
       <h2 class="text-gold">离线挂机收益</h2>
       <p class="mt-1 text-sm text-muted">
@@ -30,10 +35,7 @@ const game = useGameStore()
       <p v-if="game.pendingOffline.drops.length" class="text-sm text-fg">
         掉落 {{ game.pendingOffline.drops.length }} 件
       </p>
-      <button
-        class="mt-2 rounded bg-primary px-4 py-2 text-primary-fg"
-        @click="game.claimOffline()"
-      >
+      <button class="mt-2 rounded bg-primary px-4 py-2 text-primary-fg" @click="game.claimOffline()">
         领取
       </button>
     </div>

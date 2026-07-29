@@ -7,7 +7,7 @@ import { computePlayerStats } from '@/logic/statsLogic'
 import { runBattle, type AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
 import { rollDrop, rollStones, MAX_STAR, enhanceCost } from '@/logic/equipmentLogic'
-import { formationHeroes, heroesToAcquire } from '@/logic/heroLogic'
+import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
 import { settleOffline } from '@/logic/offlineLogic'
@@ -26,6 +26,11 @@ function defaultPlayer(): Player {
     innerSkill: null,
     innerSkills: [],
     stones: 0,
+    heroLevels: {},
+    heroExp: {},
+    heroEquipped: {},
+    seenEquipment: [],
+    seenEnemies: [],
     currentLevelId: FIRST_LEVEL_ID,
     clearedLevelIds: [],
     createdAt: 0,
@@ -33,7 +38,6 @@ function defaultPlayer(): Player {
   }
 }
 
-/** 旧装备补 star 字段 */
 function ensureStar(eq: Equipment | null): void {
   if (eq && eq.star === undefined) eq.star = 0
 }
@@ -50,7 +54,6 @@ export const useGameStore = defineStore('game', {
     }
   },
   actions: {
-    /** 兼容旧存档：补全缺失字段与新增槽位/装备星数 */
     normalize() {
       const d = defaultPlayer()
       const p = this.player as Partial<Player>
@@ -74,6 +77,11 @@ export const useGameStore = defineStore('game', {
         innerSkill: p.innerSkill ?? d.innerSkill,
         innerSkills: p.innerSkills ?? d.innerSkills,
         stones: p.stones ?? d.stones,
+        heroLevels: p.heroLevels ?? d.heroLevels,
+        heroExp: p.heroExp ?? d.heroExp,
+        heroEquipped: p.heroEquipped ?? d.heroEquipped,
+        seenEquipment: p.seenEquipment ?? d.seenEquipment,
+        seenEnemies: p.seenEnemies ?? d.seenEnemies,
         currentLevelId: p.currentLevelId ?? d.currentLevelId,
         clearedLevelIds: p.clearedLevelIds ?? d.clearedLevelIds,
         createdAt: p.createdAt || Date.now(),
@@ -81,6 +89,7 @@ export const useGameStore = defineStore('game', {
       }
       for (const eq of this.player.bag) ensureStar(eq)
       for (const slot of ALL_SLOTS) ensureStar(this.player.equipped[slot])
+      for (const id in this.player.heroEquipped) ensureStar(this.player.heroEquipped[id])
     },
 
     setPlayerName(name: string) {
@@ -106,14 +115,12 @@ export const useGameStore = defineStore('game', {
       this.touchSave()
     },
 
-    /** 加 1 点天赋 */
     addTalent(key: string) {
       if (availableTalentPoints(this.player) <= 0) return
       this.player.talents[key] = (this.player.talents[key] || 0) + 1
       this.touchSave()
     },
 
-    /** 装备内功 */
     equipInner(id: string) {
       if (this.player.innerSkills.includes(id)) {
         this.player.innerSkill = id
@@ -121,7 +128,6 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    /** 强化装备：消耗强化石升 1 星 */
     enhanceEquipment(eqId: string) {
       let eq: Equipment | undefined = this.player.bag.find((e) => e.id === eqId)
       if (!eq) {
@@ -141,12 +147,33 @@ export const useGameStore = defineStore('game', {
       this.touchSave()
     },
 
+    /** 给侠客穿装备（从背包取，旧装备回背包） */
+    equipHero(heroId: string, eqId: string) {
+      if (!this.player.heroes.includes(heroId)) return
+      const idx = this.player.bag.findIndex((e) => e.id === eqId)
+      if (idx < 0) return
+      const eq = this.player.bag[idx]
+      this.player.bag.splice(idx, 1)
+      const old = this.player.heroEquipped[heroId] || null
+      this.player.heroEquipped[heroId] = eq
+      if (old) this.player.bag.push(old)
+      this.touchSave()
+    },
+
+    /** 卸下侠客装备 */
+    unequipHero(heroId: string) {
+      const eq = this.player.heroEquipped[heroId]
+      if (!eq) return
+      this.player.heroEquipped[heroId] = null
+      this.player.bag.push(eq)
+      this.touchSave()
+    },
+
     touchSave() {
       this.lastSaveTime = Date.now()
       this.player.lastActiveTime = Date.now()
     },
 
-    /** 挑战关卡 */
     challengeLevel(levelId: string): BattleResult | null {
       const level = getLevel(levelId)
       if (!level) return null
@@ -155,12 +182,14 @@ export const useGameStore = defineStore('game', {
         { name: this.player.name, stats: computePlayerStats(this.player), skill: this.sectInfo.skill }
       ]
       for (const h of formationHeroes(this.player)) {
-        allies.push({ name: h.name, stats: h.stats, skill: h.skill })
+        const lvl = this.player.heroLevels[h.id] || 1
+        const eq = this.player.heroEquipped[h.id] || null
+        allies.push({ name: h.name, stats: computeHeroStats(h, lvl, eq), skill: h.skill })
       }
 
       const result = runBattle(allies, level.enemies)
       if (result.win) {
-        // 经验（悟性加成）
+        // 主角经验（悟性加成）
         const { expBonus } = talentBonus(this.player.talents)
         const expGain = Math.floor(result.expGained * (1 + expBonus))
         this.player.exp += expGain
@@ -186,8 +215,30 @@ export const useGameStore = defineStore('game', {
         this.player.stones += stones
         result.stonesGained = stones
 
+        // 图鉴：见过敌人 + 装备
+        for (const e of level.enemies) {
+          if (!this.player.seenEnemies.includes(e.id)) this.player.seenEnemies.push(e.id)
+        }
+        for (const d of drops) {
+          const key = `${d.slot}-${d.grade}`
+          if (!this.player.seenEquipment.includes(key)) this.player.seenEquipment.push(key)
+        }
+
         if (!this.player.clearedLevelIds.includes(levelId)) {
           this.player.clearedLevelIds.push(levelId)
+        }
+
+        // 侠客经验（主角的 50%）
+        const heroExpGain = Math.floor(result.expGained * 0.5)
+        for (const h of formationHeroes(this.player)) {
+          let exp = (this.player.heroExp[h.id] || 0) + heroExpGain
+          let lvl = this.player.heroLevels[h.id] || 1
+          while (exp >= heroExpToNext(lvl)) {
+            exp -= heroExpToNext(lvl)
+            lvl++
+          }
+          this.player.heroExp[h.id] = exp
+          this.player.heroLevels[h.id] = lvl
         }
 
         // 获取侠客

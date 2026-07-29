@@ -23,3 +23,9 @@ export function rollStones(enemy: Enemy): number {
   if (Math.random() > 0.35) return 0
   return 1 + Math.floor(Math.random() * 2) // 普通怪 35% 掉 1-2
 }
+
+/** 击败敌人后掉落的银两 */
+export function rollSilver(enemy: Enemy): number {
+  if (enemy.dropRate >= 0.9) return 30 + Math.floor(Math.random() * 21) // BOSS 30-50
+  return 5 + Math.floor(Math.random() * 6) // 普通 5-10
+}

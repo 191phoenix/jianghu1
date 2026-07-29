@@ -3,14 +3,17 @@ import type { Player, BattleResult, Equipment, EquipSlot, OfflineReward, Sect } 
 import { DEFAULT_SECT, SECTS } from '@/config/sectConfig'
 import { FIRST_LEVEL_ID, getLevel, nextLevelId } from '@/config/levelConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
+import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE } from '@/config/shopConfig'
 import { computePlayerStats } from '@/logic/statsLogic'
 import { runBattle, type AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
-import { rollDrop, rollStones, MAX_STAR, enhanceCost } from '@/logic/equipmentLogic'
+import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost } from '@/logic/equipmentLogic'
 import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
 import { settleOffline } from '@/logic/offlineLogic'
+import { rollShopItems } from '@/logic/shopLogic'
+import { TASKS, isTaskDone } from '@/logic/taskLogic'
 
 function defaultPlayer(): Player {
   return {
@@ -31,6 +34,10 @@ function defaultPlayer(): Player {
     heroEquipped: {},
     seenEquipment: [],
     seenEnemies: [],
+    silver: 0,
+    enhanceCount: 0,
+    shopItems: [],
+    tasksClaimed: [],
     currentLevelId: FIRST_LEVEL_ID,
     clearedLevelIds: [],
     createdAt: 0,
@@ -82,6 +89,10 @@ export const useGameStore = defineStore('game', {
         heroEquipped: p.heroEquipped ?? d.heroEquipped,
         seenEquipment: p.seenEquipment ?? d.seenEquipment,
         seenEnemies: p.seenEnemies ?? d.seenEnemies,
+        silver: p.silver ?? d.silver,
+        enhanceCount: p.enhanceCount ?? d.enhanceCount,
+        shopItems: p.shopItems ?? d.shopItems,
+        tasksClaimed: p.tasksClaimed ?? d.tasksClaimed,
         currentLevelId: p.currentLevelId ?? d.currentLevelId,
         clearedLevelIds: p.clearedLevelIds ?? d.clearedLevelIds,
         createdAt: p.createdAt || Date.now(),
@@ -90,6 +101,7 @@ export const useGameStore = defineStore('game', {
       for (const eq of this.player.bag) ensureStar(eq)
       for (const slot of ALL_SLOTS) ensureStar(this.player.equipped[slot])
       for (const id in this.player.heroEquipped) ensureStar(this.player.heroEquipped[id])
+      for (const eq of this.player.shopItems) ensureStar(eq)
     },
 
     setPlayerName(name: string) {
@@ -144,10 +156,10 @@ export const useGameStore = defineStore('game', {
       if (this.player.stones < cost) return
       this.player.stones -= cost
       eq.star++
+      this.player.enhanceCount++
       this.touchSave()
     },
 
-    /** 给侠客穿装备（从背包取，旧装备回背包） */
     equipHero(heroId: string, eqId: string) {
       if (!this.player.heroes.includes(heroId)) return
       const idx = this.player.bag.findIndex((e) => e.id === eqId)
@@ -160,7 +172,6 @@ export const useGameStore = defineStore('game', {
       this.touchSave()
     },
 
-    /** 卸下侠客装备 */
     unequipHero(heroId: string) {
       const eq = this.player.heroEquipped[heroId]
       if (!eq) return
@@ -189,7 +200,6 @@ export const useGameStore = defineStore('game', {
 
       const result = runBattle(allies, level.enemies)
       if (result.win) {
-        // 主角经验（悟性加成）
         const { expBonus } = talentBonus(this.player.talents)
         const expGain = Math.floor(result.expGained * (1 + expBonus))
         this.player.exp += expGain
@@ -199,7 +209,6 @@ export const useGameStore = defineStore('game', {
           this.player.level++
         }
 
-        // 装备掉落
         const drops: Equipment[] = []
         const levelIdx = (level.chapter - 1) * 10 + level.index
         for (const e of level.enemies) {
@@ -209,13 +218,17 @@ export const useGameStore = defineStore('game', {
         result.drops = drops
         this.player.bag.push(...drops)
 
-        // 强化石
         let stones = 0
-        for (const e of level.enemies) stones += rollStones(e)
+        let silver = 0
+        for (const e of level.enemies) {
+          stones += rollStones(e)
+          silver += rollSilver(e)
+        }
         this.player.stones += stones
+        this.player.silver += silver
         result.stonesGained = stones
+        result.silverGained = silver
 
-        // 图鉴：见过敌人 + 装备
         for (const e of level.enemies) {
           if (!this.player.seenEnemies.includes(e.id)) this.player.seenEnemies.push(e.id)
         }
@@ -228,7 +241,6 @@ export const useGameStore = defineStore('game', {
           this.player.clearedLevelIds.push(levelId)
         }
 
-        // 侠客经验（主角的 50%）
         const heroExpGain = Math.floor(result.expGained * 0.5)
         for (const h of formationHeroes(this.player)) {
           let exp = (this.player.heroExp[h.id] || 0) + heroExpGain
@@ -241,7 +253,6 @@ export const useGameStore = defineStore('game', {
           this.player.heroLevels[h.id] = lvl
         }
 
-        // 获取侠客
         const acquired: string[] = []
         for (const h of heroesToAcquire(levelId)) {
           if (!this.player.heroes.includes(h.id)) {
@@ -251,7 +262,6 @@ export const useGameStore = defineStore('game', {
         }
         result.acquiredHeroes = acquired
 
-        // 获取内功
         const acquiredInner: string[] = []
         for (const s of innerSkillsToAcquire(levelId)) {
           if (!this.player.innerSkills.includes(s.id)) {
@@ -283,6 +293,52 @@ export const useGameStore = defineStore('game', {
       if (!eq) return
       this.player.equipped[slot] = null
       this.player.bag.push(eq)
+    },
+
+    /** 商店：买装备摊指定位置 */
+    buyShopEquip(idx: number) {
+      const eq = this.player.shopItems[idx]
+      if (!eq) return
+      const price = EQUIP_PRICE[eq.grade]
+      if (this.player.silver < price) return
+      this.player.silver -= price
+      this.player.shopItems.splice(idx, 1)
+      this.player.bag.push(eq)
+      this.touchSave()
+    },
+
+    /** 商店：花银两买 1 颗强化石 */
+    buyStones() {
+      if (this.player.silver < STONE_PRICE) return
+      this.player.silver -= STONE_PRICE
+      this.player.stones += 1
+      this.touchSave()
+    },
+
+    /** 商店：刷新装备摊 */
+    refreshShop() {
+      if (this.player.silver < REFRESH_PRICE) return
+      this.player.silver -= REFRESH_PRICE
+      this.player.shopItems = rollShopItems(this.player)
+      this.touchSave()
+    },
+
+    initShopIfEmpty() {
+      if (this.player.shopItems.length === 0) {
+        this.player.shopItems = rollShopItems(this.player)
+      }
+    },
+
+    /** 领取任务奖励 */
+    claimTask(id: string) {
+      const task = TASKS.find((t) => t.id === id)
+      if (!task) return
+      if (this.player.tasksClaimed.includes(id)) return
+      if (!isTaskDone(this.player, task)) return
+      this.player.silver += task.reward.silver
+      this.player.stones += task.reward.stones
+      this.player.tasksClaimed.push(id)
+      this.touchSave()
     },
 
     checkOffline() {

@@ -14,14 +14,21 @@ const game = useGameStore()
         {{ game.sectInfo.name }} · 等级 {{ game.player.level }}
       </div>
       <div class="mt-1 text-xs text-muted">
-        已通关 {{ game.player.clearedLevelIds.length }} 关 · 强化石 {{ game.player.stones }}
+        已通关 {{ game.player.clearedLevelIds.length }} 关 · 银两 {{ game.player.silver }} · 强化石 {{ game.player.stones }}
       </div>
     </div>
 
-    <RouterLink to="/codex" class="block rounded-lg border border-border bg-surface p-4">
-      <div class="text-fg">图鉴</div>
-      <div class="text-xs text-muted">装备 / 侠客 / 内功 / 怪物收集进度</div>
-    </RouterLink>
+    <div class="grid grid-cols-3 gap-2">
+      <RouterLink to="/codex" class="rounded-lg border border-border bg-surface p-3 text-center">
+        <div class="text-fg">图鉴</div>
+      </RouterLink>
+      <RouterLink to="/shop" class="rounded-lg border border-border bg-surface p-3 text-center">
+        <div class="text-fg">商店</div>
+      </RouterLink>
+      <RouterLink to="/task" class="rounded-lg border border-border bg-surface p-3 text-center">
+        <div class="text-fg">任务</div>
+      </RouterLink>
+    </div>
 
     <div v-if="game.pendingOffline" class="rounded-lg border border-gold bg-surface p-4">
       <h2 class="text-gold">离线挂机收益</h2>

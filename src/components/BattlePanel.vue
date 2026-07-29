@@ -63,6 +63,7 @@ const dropText = computed(() =>
       <div v-if="result.win" class="mt-1 text-xs text-muted">
         经验 +{{ result.expGained }}
         <span v-if="result.stonesGained">· 强化石 +{{ result.stonesGained }}</span>
+        <span v-if="result.silverGained">· 银两 +{{ result.silverGained }}</span>
         <span v-if="dropText">· 掉落：{{ dropText }}</span>
       </div>
       <div v-if="result.acquiredHeroes.length" class="mt-1 text-xs text-gold">

@@ -85,6 +85,7 @@ export interface BattleResult {
   drops: Equipment[]
   acquiredHeroes: string[] // 本次通关新获得的侠客名
   stonesGained: number // 本次通关获得的强化石
+  silverGained: number // 本次通关获得的银两
   acquiredInnerSkills: string[] // 本次通关新获得的内功名
 }
 
@@ -116,6 +117,10 @@ export interface Player {
   heroEquipped: Record<string, Equipment | null> // 侠客装备（1 槽）
   seenEquipment: string[] // 见过的装备 slot-grade
   seenEnemies: string[] // 见过的敌人 id
+  silver: number // 银两
+  enhanceCount: number // 强化总次数
+  shopItems: Equipment[] // 商店装备摊
+  tasksClaimed: string[] // 已领奖的任务 id
   currentLevelId: string
   clearedLevelIds: string[]
   createdAt: number

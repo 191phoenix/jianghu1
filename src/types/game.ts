@@ -18,6 +18,7 @@ export interface Equipment {
   slot: EquipSlot
   grade: EquipGrade
   stats: Partial<Stats>
+  star: number // 0-5 强化星数
 }
 
 /** 敌人 */
@@ -83,6 +84,8 @@ export interface BattleResult {
   expGained: number
   drops: Equipment[]
   acquiredHeroes: string[] // 本次通关新获得的侠客名
+  stonesGained: number // 本次通关获得的强化石
+  acquiredInnerSkills: string[] // 本次通关新获得的内功名
 }
 
 /** 离线挂机收益 */
@@ -90,10 +93,11 @@ export interface OfflineReward {
   duration: number // 实际结算秒数
   exp: number
   drops: Equipment[]
+  stones: number
   levelId: string
 }
 
-/** 玩家（阶段 2 扩展） */
+/** 玩家（阶段 3 扩展） */
 export interface Player {
   name: string
   sect: string
@@ -103,6 +107,10 @@ export interface Player {
   bag: Equipment[]
   heroes: string[] // 已获侠客 id
   formation: (string | null)[] // 上阵位（2 个），存侠客 id 或 null
+  talents: Record<string, number> // 已分配天赋级数
+  innerSkill: string | null // 当前装备的内功 id
+  innerSkills: string[] // 已获内功 id
+  stones: number // 强化石
   currentLevelId: string
   clearedLevelIds: string[]
   createdAt: number

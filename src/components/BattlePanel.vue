@@ -28,7 +28,6 @@ const dropText = computed(() =>
 
 <template>
   <div class="space-y-2 rounded-lg border border-border bg-surface p-3">
-    <!-- 双方 HP 条 -->
     <div class="flex justify-between gap-4 text-sm">
       <div class="flex-1 space-y-1">
         <div v-for="a in allies" :key="a.name">
@@ -48,7 +47,6 @@ const dropText = computed(() =>
       </div>
     </div>
 
-    <!-- 回合日志 -->
     <div class="max-h-44 space-y-0.5 overflow-y-auto rounded bg-bg p-2 text-xs">
       <div v-for="(line, i) in result.log" :key="i" class="text-muted">
         <span class="text-gold">[{{ line.round }}]</span>
@@ -59,16 +57,19 @@ const dropText = computed(() =>
       </div>
     </div>
 
-    <!-- 结果 -->
     <div class="pt-1 text-center">
       <div v-if="result.win" class="text-gold">胜利！{{ result.rounds }} 回合</div>
       <div v-else class="text-primary">失败…坚持了 {{ result.rounds }} 回合</div>
       <div v-if="result.win" class="mt-1 text-xs text-muted">
         经验 +{{ result.expGained }}
+        <span v-if="result.stonesGained">· 强化石 +{{ result.stonesGained }}</span>
         <span v-if="dropText">· 掉落：{{ dropText }}</span>
       </div>
       <div v-if="result.acquiredHeroes.length" class="mt-1 text-xs text-gold">
         结识侠客：{{ result.acquiredHeroes.join('、') }}
+      </div>
+      <div v-if="result.acquiredInnerSkills.length" class="mt-1 text-xs text-gold">
+        习得内功：{{ result.acquiredInnerSkills.join('、') }}
       </div>
     </div>
   </div>

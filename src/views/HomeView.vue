@@ -14,7 +14,7 @@ const game = useGameStore()
         {{ game.sectInfo.name }} · 等级 {{ game.player.level }}
       </div>
       <div class="mt-1 text-xs text-muted">
-        已通关 {{ game.player.clearedLevelIds.length }} 关
+        已通关 {{ game.player.clearedLevelIds.length }} 关 · 强化石 {{ game.player.stones }}
       </div>
     </div>
 
@@ -24,6 +24,9 @@ const game = useGameStore()
         离线 {{ Math.floor(game.pendingOffline.duration / 60) }} 分钟，扫荡已通关卡
       </p>
       <p class="text-sm text-fg">经验 +{{ game.pendingOffline.exp }}</p>
+      <p v-if="game.pendingOffline.stones" class="text-sm text-fg">
+        强化石 +{{ game.pendingOffline.stones }}
+      </p>
       <p v-if="game.pendingOffline.drops.length" class="text-sm text-fg">
         掉落 {{ game.pendingOffline.drops.length }} 件
       </p>

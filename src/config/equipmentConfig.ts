@@ -60,7 +60,7 @@ export function rollEquipment(slot: EquipSlot, grade: EquipGrade, id: string): E
       stats[key] = Math.floor(val)
     }
   }
-  return { id, name: SLOT_NAMES[slot][grade], slot, grade, stats }
+  return { id, name: SLOT_NAMES[slot][grade], slot, grade, stats, star: 0 }
 }
 
 /** 按关卡难度随机品阶（关数越高，高级概率越大） */

@@ -9,3 +9,17 @@ export function rollDrop(enemy: Enemy, levelIdx: number): Equipment | null {
   const grade = randomDropGrade(levelIdx)
   return rollEquipment(slot, grade, genId('eq'))
 }
+
+export const MAX_STAR = 5
+
+/** 强化到下一星所需的强化石 = 当前星数 + 1 */
+export function enhanceCost(currentStar: number): number {
+  return currentStar + 1
+}
+
+/** 击败敌人后掉落的强化石数量 */
+export function rollStones(enemy: Enemy): number {
+  if (enemy.dropRate >= 0.9) return 3 + Math.floor(Math.random() * 3) // BOSS 必掉 3-5
+  if (Math.random() > 0.35) return 0
+  return 1 + Math.floor(Math.random() * 2) // 普通怪 35% 掉 1-2
+}

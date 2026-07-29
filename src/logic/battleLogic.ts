@@ -71,5 +71,5 @@ export function runBattle(allies: AllyInput[], enemies: Enemy[]): BattleResult {
 
   const win = allyFighters.some((a) => a.hp > 0) && foes.every((fo) => fo.hp <= 0)
   const expGained = win ? enemies.reduce((s, e) => s + e.expReward, 0) : 0
-  return { win, rounds: round, log, expGained, drops: [], acquiredHeroes: [] }
+  return { win, rounds: round, log, expGained, drops: [], acquiredHeroes: [], stonesGained: 0, acquiredInnerSkills: [] }
 }

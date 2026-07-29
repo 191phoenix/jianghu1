@@ -1,0 +1,32 @@
+{
+  "name": "jianghu1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview --host --port 8080"
+  },
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "file-saver": "^2.0.5",
+    "pinia": "^3.0.0",
+    "pinia-plugin-persistedstate": "^4.1.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/crypto-js": "^4.2.2",
+    "@types/file-saver": "^2.0.7",
+    "@types/node": "^22.10.0",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "lightningcss": "^1.29.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.7",
+    "vite-plugin-pwa": "^1.0.0",
+    "vue-tsc": "^2.2.0"
+  }
+}

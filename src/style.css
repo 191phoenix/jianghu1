@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* 古风主题色：墨底 / 朱砂 / 米黄 / 金 */
+@theme {
+  --color-bg: #1a1612;
+  --color-surface: #2a221c;
+  --color-fg: #e8dcc8;
+  --color-muted: #9a8a72;
+  --color-primary: #a83232;
+  --color-primary-fg: #f5ede0;
+  --color-border: #3d3328;
+  --color-gold: #c9a961;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* 隐藏滚动条但保留滚动 */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

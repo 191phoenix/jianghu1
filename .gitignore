@@ -1,0 +1,21 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# TypeScript 增量构建缓存
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

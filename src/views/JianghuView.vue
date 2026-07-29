@@ -25,7 +25,7 @@ const chapters = computed(() => {
 <template>
   <div class="space-y-3 p-4">
     <h1 class="text-2xl text-gold">江湖</h1>
-    <p class="text-xs text-muted">点挑战进入回合战斗，手动选普攻 / 技能 / 目标。</p>
+    <p class="text-xs text-muted">点「进入」走路径推图，沿途遇剧情与怪，击败关主通关。</p>
 
     <div v-for="[ch, levels] in chapters" :key="ch" class="space-y-1">
       <div class="text-sm text-gold">第{{ CHAPTER_LABEL[ch - 1] || ch }}章</div>
@@ -47,9 +47,9 @@ const chapters = computed(() => {
           <button
             v-if="isUnlocked(lvl.id)"
             class="rounded bg-primary px-3 py-1 text-primary-fg"
-            @click="game.startBattle(lvl.id)"
+            @click="game.enterPath(lvl.id)"
           >
-            挑战
+            进入
           </button>
         </div>
       </div>

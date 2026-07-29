@@ -3,10 +3,21 @@ import type {
   BattleState,
   BattleFighter,
   BattleAction,
-  BattleLine
+  BattleLine,
+  Enemy
 } from '@/types/game'
-import type { Enemy } from '@/types/game'
-import { calcDamage, makeFighter, makeEnemyFighter, aiPickAction, MAX_ROUNDS, type AllyInput } from '@/logic/battleLogic'
+import {
+  calcDamage,
+  makeFighter,
+  makeEnemyFighter,
+  aiPickAction,
+  attackPatternCells,
+  MAX_ROUNDS,
+  type AllyInput
+} from '@/logic/battleLogic'
+
+/** 敌人自动落位顺序：前排优先（6,7,8 为前排，靠我方） */
+const ENEMY_POS_ORDER = [6, 7, 8, 3, 4, 5, 0, 1, 2]
 
 export const useBattleStore = defineStore('battle', {
   state: () => ({
@@ -15,34 +26,80 @@ export const useBattleStore = defineStore('battle', {
   getters: {
     /** 当前行动者 */
     active(state): BattleFighter | null {
-      if (!state.battle || state.battle.phase === 'ended') return null
+      if (!state.battle || state.battle.phase === 'ended' || state.battle.phase === 'setup') return null
       const id = state.battle.order[state.battle.actorIdx]
       if (!id) return null
       return [...state.battle.allies, ...state.battle.enemies].find((f) => f.id === id) ?? null
     }
   },
   actions: {
-    /** 初始化一场战斗 */
-    initBattle(levelId: string, allies: AllyInput[], enemies: Enemy[]) {
-      const allyF = allies.map((a) => makeFighter(a, true))
-      const enemyF = enemies.map((e, i) => makeEnemyFighter(e, i))
-      const order = [...allyF, ...enemyF]
-        .sort((a, b) => b.stats.spd - a.stats.spd)
-        .map((f) => f.id)
-      const first = [...allyF, ...enemyF].find((f) => f.id === order[0])!
+    /** 进入布阵阶段：构造敌人（自动站位）+ 我方默认站位 */
+    initSetup(levelId: string, enemies: Enemy[], setupChosen: string[], setupGrid: (string | null)[]) {
+      const enemyF = enemies.map((e, i) => makeEnemyFighter(e, i, ENEMY_POS_ORDER[i] ?? 0))
       this.battle = {
         levelId,
-        allies: allyF,
+        allies: [],
         enemies: enemyF,
         round: 1,
         actorIdx: 0,
-        order,
-        phase: first.isPlayer ? 'player' : 'enemy',
+        order: [],
+        phase: 'setup',
         log: [],
         result: null,
-        pendingAction: null
+        pendingAction: null,
+        setupChosen: [...setupChosen],
+        setupGrid: [...setupGrid],
+        pendingTargetCell: null
       }
+    },
+
+    /** 布阵完成，进入战斗：构造我方 fighters 并按速度排序开打 */
+    startCombat(allies: AllyInput[]) {
+      const b = this.battle
+      if (!b) return
+      const allyF = allies.map((a) => makeFighter(a, true))
+      b.allies = allyF
+      const all = [...allyF, ...b.enemies]
+      b.order = all.sort((x, y) => y.stats.spd - x.stats.spd).map((f) => f.id)
+      b.actorIdx = 0
+      b.round = 1
+      const first = all.find((f) => f.id === b.order[0])!
+      b.phase = first.isPlayer ? 'player' : 'enemy'
       if (!first.isPlayer) this.enemyTurn()
+    },
+
+    /** 布阵：加入/移除一名侠客（≤2，不含主角） */
+    setupToggleHero(heroId: string) {
+      const b = this.battle
+      if (!b || b.phase !== 'setup') return
+      const i = b.setupChosen.indexOf(heroId)
+      if (i >= 0) {
+        b.setupChosen.splice(i, 1)
+        const cell = b.setupGrid.indexOf(heroId)
+        if (cell >= 0) b.setupGrid[cell] = null
+      } else {
+        if (b.setupChosen.length >= 2) return
+        b.setupChosen.push(heroId)
+      }
+    },
+
+    /** 布阵：把 main/侠客 放到指定格（自动从旧格移除；目标格原占者被顶替回候选） */
+    setupPlace(key: string, cell: number) {
+      const b = this.battle
+      if (!b || b.phase !== 'setup') return
+      if (cell < 0 || cell > 8) return
+      if (key !== 'main' && !b.setupChosen.includes(key)) return
+      const old = b.setupGrid.indexOf(key)
+      if (old >= 0) b.setupGrid[old] = null
+      b.setupGrid[cell] = key
+    },
+
+    /** 布阵：清空一格 */
+    setupClearCell(cell: number) {
+      const b = this.battle
+      if (!b || b.phase !== 'setup') return
+      if (cell < 0 || cell > 8) return
+      b.setupGrid[cell] = null
     },
 
     findFighter(id: string): BattleFighter | undefined {
@@ -55,25 +112,30 @@ export const useBattleStore = defineStore('battle', {
       if (this.battle) this.battle.pendingAction = action
     },
 
-    /** 玩家选目标，执行行动 */
-    playerChooseTarget(targetIdx: number) {
-      if (!this.battle || !this.battle.pendingAction) return
-      const action = this.battle.pendingAction
-      this.battle.pendingAction = null
-      this.performAction(action, targetIdx)
+    /** 玩家选目标格，执行行动 */
+    playerChooseTargetCell(cell: number) {
+      const b = this.battle
+      if (!b || !b.pendingAction) return
+      const action = b.pendingAction
+      b.pendingAction = null
+      b.pendingTargetCell = null
+      this.performActionOnCell(action, cell)
     },
 
     cancelAction() {
-      if (this.battle) this.battle.pendingAction = null
+      if (this.battle) {
+        this.battle.pendingAction = null
+        this.battle.pendingTargetCell = null
+      }
     },
 
-    /** 执行一次行动 */
-    performAction(action: BattleAction, targetIdx: number) {
+    /** 执行一次行动：按武器形状对目标格及关联格造成伤害 */
+    performActionOnCell(action: BattleAction, cell: number) {
       const b = this.battle!
       const actor = this.active!
       const targets = actor.isPlayer ? b.enemies : b.allies
-      const target = targets[targetIdx]
-      if (!target || target.hp <= 0) return
+      const primary = targets.find((t) => t.pos === cell && t.hp > 0)
+      if (!primary) return
 
       let multiplier = 1
       let skillName: string | undefined
@@ -83,17 +145,21 @@ export const useBattleStore = defineStore('battle', {
         actor.skillCd = actor.skill.trigger.n
       }
 
-      const { dmg, crit } = calcDamage(actor.stats, target.stats, multiplier)
-      target.hp -= dmg
-      const line: BattleLine = {
-        round: b.round,
-        attacker: actor.name,
-        target: target.name,
-        dmg,
-        crit,
-        skillName
+      const cells = attackPatternCells(actor.weaponType, cell)
+      const hit = targets.filter((t) => t.hp > 0 && cells.includes(t.pos))
+      for (const t of hit) {
+        const { dmg, crit } = calcDamage(actor.stats, t.stats, multiplier)
+        t.hp -= dmg
+        const line: BattleLine = {
+          round: b.round,
+          attacker: actor.name,
+          target: t.name,
+          dmg,
+          crit,
+          skillName
+        }
+        b.log.push(line)
       }
-      b.log.push(line)
 
       // 非技能行动递减技能 CD
       if (action !== 'skill' && actor.skillCd > 0) actor.skillCd--
@@ -149,8 +215,12 @@ export const useBattleStore = defineStore('battle', {
     enemyTurn() {
       const b = this.battle!
       const actor = this.active!
-      const { action, targetIdx } = aiPickAction(actor, b.allies)
-      this.performAction(action, targetIdx)
+      const { action, cell } = aiPickAction(actor, b.allies)
+      if (cell < 0) {
+        this.afterAction()
+        return
+      }
+      this.performActionOnCell(action, cell)
     },
 
     endBattle() {

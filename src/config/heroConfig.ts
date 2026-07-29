@@ -13,7 +13,8 @@ export const HEROES: Hero[] = [
       desc: '每 4 回合一剑封喉，造成 2.5 倍伤害',
       trigger: { type: 'every-n-rounds', n: 4 },
       multiplier: 2.5
-    }
+    },
+    weaponType: 'sword'
   },
   {
     id: 'huyidao',
@@ -26,7 +27,8 @@ export const HEROES: Hero[] = [
       desc: '每 3 回合力劈华山，造成 1.8 倍伤害',
       trigger: { type: 'every-n-rounds', n: 3 },
       multiplier: 1.8
-    }
+    },
+    weaponType: 'saber'
   },
   {
     id: 'chenglinsu',
@@ -39,7 +41,8 @@ export const HEROES: Hero[] = [
       desc: '每 2 回合施毒，造成 1.4 倍伤害',
       trigger: { type: 'every-n-rounds', n: 2 },
       multiplier: 1.4
-    }
+    },
+    weaponType: 'whip'
   }
 ]
 

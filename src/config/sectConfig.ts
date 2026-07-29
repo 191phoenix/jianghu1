@@ -10,7 +10,8 @@ export const SECTS: Record<string, Sect> = {
       desc: '每 3 回合连刺三剑，造成 1.8 倍伤害',
       trigger: { type: 'every-n-rounds', n: 3 },
       multiplier: 1.8
-    }
+    },
+    weaponType: 'sword'
   },
   shaolin: {
     id: 'shaolin',
@@ -21,7 +22,8 @@ export const SECTS: Record<string, Sect> = {
       desc: '每 4 回合激发金钟罩，造成 1.6 倍伤害',
       trigger: { type: 'every-n-rounds', n: 4 },
       multiplier: 1.6
-    }
+    },
+    weaponType: 'fist'
   },
   gaibang: {
     id: 'gaibang',
@@ -32,7 +34,8 @@ export const SECTS: Record<string, Sect> = {
       desc: '每 3 回合连环棒击，造成 1.9 倍伤害',
       trigger: { type: 'every-n-rounds', n: 3 },
       multiplier: 1.9
-    }
+    },
+    weaponType: 'staff'
   }
 }
 

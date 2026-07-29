@@ -7,6 +7,7 @@ import { INNER_SKILLS } from '@/config/innerSkillConfig'
 import { availableTalentPoints } from '@/logic/talentLogic'
 import { computePlayerStats, baseStatsByLevel } from '@/logic/statsLogic'
 import { expToNext } from '@/logic/growthLogic'
+import { WEAPON_TYPE_LABEL, WEAPON_TYPE_SHAPE } from '@/logic/battleLogic'
 import { statLabel, formatStatValue } from '@/utils/format'
 import type { Stats } from '@/types/game'
 import SaveManager from '@/components/SaveManager.vue'
@@ -76,6 +77,9 @@ function saveName() {
             <span v-if="game.player.sect === s.id" class="text-xs text-gold">当前</span>
           </div>
           <div class="text-xs text-muted">{{ s.desc }}</div>
+          <div class="text-xs text-primary">
+            兵器：{{ WEAPON_TYPE_LABEL[s.weaponType] }}（{{ WEAPON_TYPE_SHAPE[s.weaponType] }}）
+          </div>
           <div class="mt-0.5 text-xs text-gold">【{{ s.skill.name }}】{{ s.skill.desc }}</div>
         </div>
       </div>

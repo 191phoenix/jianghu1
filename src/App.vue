@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import AppTabBar from '@/components/AppTabBar.vue'
 import BattleView from '@/views/BattleView.vue'
+import PathView from '@/views/PathView.vue'
 import { useGameStore } from '@/stores/gameStore'
 
 const game = useGameStore()
@@ -18,6 +19,7 @@ onMounted(() => {
       <RouterView />
     </main>
     <AppTabBar />
+    <PathView />
     <BattleView />
   </div>
 </template>

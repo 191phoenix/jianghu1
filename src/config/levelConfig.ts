@@ -1,4 +1,8 @@
-import type { LevelDef, Enemy, Stats } from '@/types/game'
+import type { LevelDef, Enemy, Stats, WeaponType } from '@/types/game'
+import { genId } from '@/utils/id'
+
+/** 普通怪武器类型轮换；BOSS 用鞭(全体)以让站位有意义 */
+const MOB_WEAPONS: WeaponType[] = ['sword', 'saber', 'staff', 'fist']
 
 /** 按全局序号生成敌人，属性线性递增；BOSS 关属性翻倍 */
 function makeEnemy(id: string, name: string, idx: number, isBoss: boolean): Enemy {
@@ -16,12 +20,31 @@ function makeEnemy(id: string, name: string, idx: number, isBoss: boolean): Enem
     name,
     stats,
     expReward: Math.floor((18 + idx * 8) * k),
-    dropRate: isBoss ? 0.95 : 0.22
+    dropRate: isBoss ? 0.95 : 0.22,
+    weaponType: isBoss ? 'whip' : MOB_WEAPONS[idx % MOB_WEAPONS.length]
   }
 }
 
 const MOB1 = ['山贼', '流寇', '野狼', '毒蛇', '山魈', '恶丐', '黑衣人', '山贼头目', '江湖恶客']
 const MOB2 = ['黑衣杀手', '毒蛊', '瘴鬼', '蛮兵', '邪道人', '飞贼', '魔教徒', '独眼悍匪']
+
+/** 生成路径节点上的敌人（按关卡难度缩放；精英怪强化） */
+export function makePathEnemy(levelIdx: number, elite: boolean, chapter: number): Enemy {
+  const pool = chapter === 1 ? MOB1 : MOB2
+  const name = pool[Math.floor(Math.random() * pool.length)]
+  const e = makeEnemy(genId('pe'), name, levelIdx, false)
+  if (elite) {
+    e.stats = {
+      ...e.stats,
+      hp: Math.floor(e.stats.hp * 1.6),
+      atk: Math.floor(e.stats.atk * 1.4),
+      def: Math.floor(e.stats.def * 1.3)
+    }
+    e.expReward = Math.floor(e.expReward * 1.5)
+    e.dropRate = 0.4
+  }
+  return e
+}
 
 /** 第一章：10 关 + 末关 BOSS */
 const CHAPTER1: LevelDef[] = Array.from({ length: 10 }, (_, i) => {

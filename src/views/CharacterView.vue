@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
+import { SECTS } from '@/config/sectConfig'
 import { computePlayerStats, baseStatsByLevel } from '@/logic/statsLogic'
 import { expToNext } from '@/logic/growthLogic'
 import { statLabel, formatStatValue } from '@/utils/format'
@@ -44,10 +45,8 @@ function saveName() {
         <button class="rounded bg-primary px-3 text-primary-fg" @click="saveName">保存</button>
       </div>
       <div class="mt-3 text-sm text-muted">
-        门派：<span class="text-fg">{{ game.sectInfo.name }}</span> · 等级
-        <span class="text-fg">{{ game.player.level }}</span>
+        等级 <span class="text-fg">{{ game.player.level }}</span>
       </div>
-      <!-- 经验条 -->
       <div class="mt-2">
         <div class="mb-1 flex justify-between text-xs text-muted">
           <span>经验</span>
@@ -57,7 +56,26 @@ function saveName() {
           <div class="h-full bg-gold" :style="{ width: expPct + '%' }"></div>
         </div>
       </div>
-      <p class="mt-2 text-xs text-gold">【{{ game.sectInfo.skill.name }}】{{ game.sectInfo.skill.desc }}</p>
+    </div>
+
+    <div class="rounded-lg border border-border bg-surface p-4">
+      <h2 class="mb-2 text-gold">门派</h2>
+      <div class="space-y-1">
+        <div
+          v-for="s in SECTS"
+          :key="s.id"
+          class="cursor-pointer rounded p-2"
+          :class="game.player.sect === s.id ? 'border border-gold bg-bg' : 'bg-bg'"
+          @click="game.changeSect(s.id)"
+        >
+          <div class="flex justify-between">
+            <span class="text-fg">{{ s.name }}</span>
+            <span v-if="game.player.sect === s.id" class="text-xs text-gold">当前</span>
+          </div>
+          <div class="text-xs text-muted">{{ s.desc }}</div>
+          <div class="mt-0.5 text-xs text-gold">【{{ s.skill.name }}】{{ s.skill.desc }}</div>
+        </div>
+      </div>
     </div>
 
     <div class="rounded-lg border border-border bg-surface p-4">

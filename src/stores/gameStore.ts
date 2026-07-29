@@ -3,9 +3,10 @@ import type { Player, BattleResult, Equipment, EquipSlot, OfflineReward, Sect } 
 import { DEFAULT_SECT, SECTS } from '@/config/sectConfig'
 import { FIRST_LEVEL_ID, getLevel, nextLevelId } from '@/config/levelConfig'
 import { computePlayerStats } from '@/logic/statsLogic'
-import { runBattle } from '@/logic/battleLogic'
+import { runBattle, type AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
 import { rollDrop } from '@/logic/equipmentLogic'
+import { formationHeroes, heroesToAcquire } from '@/logic/heroLogic'
 import { settleOffline } from '@/logic/offlineLogic'
 
 function defaultPlayer(): Player {
@@ -14,8 +15,10 @@ function defaultPlayer(): Player {
     sect: DEFAULT_SECT,
     level: 1,
     exp: 0,
-    equipped: { weapon: null, armor: null, accessory: null },
+    equipped: { weapon: null, armor: null, head: null, foot: null, accessory: null, neck: null },
     bag: [],
+    heroes: [],
+    formation: [null, null],
     currentLevelId: FIRST_LEVEL_ID,
     clearedLevelIds: [],
     createdAt: 0,
@@ -35,7 +38,7 @@ export const useGameStore = defineStore('game', {
     }
   },
   actions: {
-    /** 兼容旧存档：补全缺失字段（阶段 0 存档升级用） */
+    /** 兼容旧存档：补全缺失字段与新增槽位 */
     normalize() {
       const d = defaultPlayer()
       const p = this.player as Partial<Player>
@@ -47,9 +50,14 @@ export const useGameStore = defineStore('game', {
         equipped: {
           weapon: p.equipped?.weapon ?? null,
           armor: p.equipped?.armor ?? null,
-          accessory: p.equipped?.accessory ?? null
+          head: p.equipped?.head ?? null,
+          foot: p.equipped?.foot ?? null,
+          accessory: p.equipped?.accessory ?? null,
+          neck: p.equipped?.neck ?? null
         },
         bag: p.bag ?? d.bag,
+        heroes: p.heroes ?? d.heroes,
+        formation: p.formation && p.formation.length >= 2 ? p.formation : d.formation,
         currentLevelId: p.currentLevelId ?? d.currentLevelId,
         clearedLevelIds: p.clearedLevelIds ?? d.clearedLevelIds,
         createdAt: p.createdAt || Date.now(),
@@ -61,18 +69,45 @@ export const useGameStore = defineStore('game', {
       this.player.name = name
     },
 
+    /** 切换门派（不影响进度，仅换技能） */
+    changeSect(sectId: string) {
+      if (SECTS[sectId]) {
+        this.player.sect = sectId
+        this.touchSave()
+      }
+    },
+
+    /** 配置上阵侠客位 */
+    setFormation(slotIdx: number, heroId: string | null) {
+      if (slotIdx < 0 || slotIdx >= this.player.formation.length) return
+      if (heroId) {
+        const existing = this.player.formation.indexOf(heroId)
+        if (existing >= 0 && existing !== slotIdx) {
+          this.player.formation[existing] = null
+        }
+      }
+      this.player.formation[slotIdx] = heroId
+      this.touchSave()
+    },
+
     touchSave() {
       this.lastSaveTime = Date.now()
       this.player.lastActiveTime = Date.now()
     },
 
-    /** 挑战关卡，返回战斗结果（含掉落） */
+    /** 挑战关卡：组玩家方（主角+上阵侠客）与敌人战斗 */
     challengeLevel(levelId: string): BattleResult | null {
       const level = getLevel(levelId)
       if (!level) return null
-      const stats = computePlayerStats(this.player)
-      const result = runBattle(stats, this.player.name, this.sectInfo.skill, level.enemies)
 
+      const allies: AllyInput[] = [
+        { name: this.player.name, stats: computePlayerStats(this.player), skill: this.sectInfo.skill }
+      ]
+      for (const h of formationHeroes(this.player)) {
+        allies.push({ name: h.name, stats: h.stats, skill: h.skill })
+      }
+
+      const result = runBattle(allies, level.enemies)
       if (result.win) {
         this.player.exp += result.expGained
         while (this.player.exp >= expToNext(this.player.level)) {
@@ -80,15 +115,27 @@ export const useGameStore = defineStore('game', {
           this.player.level++
         }
         const drops: Equipment[] = []
+        const levelIdx = (level.chapter - 1) * 10 + level.index
         for (const e of level.enemies) {
-          const d = rollDrop(e, level.index)
+          const d = rollDrop(e, levelIdx)
           if (d) drops.push(d)
         }
         result.drops = drops
         this.player.bag.push(...drops)
+
         if (!this.player.clearedLevelIds.includes(levelId)) {
           this.player.clearedLevelIds.push(levelId)
         }
+        // 获取侠客
+        const acquired: string[] = []
+        for (const h of heroesToAcquire(levelId)) {
+          if (!this.player.heroes.includes(h.id)) {
+            this.player.heroes.push(h.id)
+            acquired.push(h.name)
+          }
+        }
+        result.acquiredHeroes = acquired
+
         const nxt = nextLevelId(levelId)
         if (nxt) this.player.currentLevelId = nxt
       }
@@ -96,7 +143,6 @@ export const useGameStore = defineStore('game', {
       return result
     },
 
-    /** 穿戴装备：从背包取出放入槽位，旧装备回背包 */
     equipItem(eqId: string) {
       const idx = this.player.bag.findIndex((e) => e.id === eqId)
       if (idx < 0) return
@@ -107,7 +153,6 @@ export const useGameStore = defineStore('game', {
       if (old) this.player.bag.push(old)
     },
 
-    /** 卸下装备 */
     unequip(slot: EquipSlot) {
       const eq = this.player.equipped[slot]
       if (!eq) return
@@ -115,7 +160,6 @@ export const useGameStore = defineStore('game', {
       this.player.bag.push(eq)
     },
 
-    /** 检查离线收益（不发放，存入 pendingOffline） */
     checkOffline() {
       const now = Date.now()
       const reward = settleOffline(this.player.lastActiveTime, now, this.player.clearedLevelIds)
@@ -123,7 +167,6 @@ export const useGameStore = defineStore('game', {
       this.player.lastActiveTime = now
     },
 
-    /** 领取离线收益 */
     claimOffline() {
       const r = this.pendingOffline
       if (!r) return

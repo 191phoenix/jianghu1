@@ -8,7 +8,7 @@ export interface Stats {
   critDmg: number // 倍数，如 1.5
 }
 
-export type EquipSlot = 'weapon' | 'armor' | 'accessory'
+export type EquipSlot = 'weapon' | 'armor' | 'head' | 'foot' | 'accessory' | 'neck'
 export type EquipGrade = 'white' | 'green' | 'blue' | 'purple'
 
 /** 装备 */
@@ -55,6 +55,16 @@ export interface Sect {
   skill: SkillDef
 }
 
+/** 侠客 */
+export interface Hero {
+  id: string
+  name: string
+  title: string
+  stats: Stats
+  skill: SkillDef
+  acquireLevelId: string // 通关此关后获得
+}
+
 /** 一条战斗日志 */
 export interface BattleLine {
   round: number
@@ -72,6 +82,7 @@ export interface BattleResult {
   log: BattleLine[]
   expGained: number
   drops: Equipment[]
+  acquiredHeroes: string[] // 本次通关新获得的侠客名
 }
 
 /** 离线挂机收益 */
@@ -82,7 +93,7 @@ export interface OfflineReward {
   levelId: string
 }
 
-/** 玩家（阶段 1 扩展） */
+/** 玩家（阶段 2 扩展） */
 export interface Player {
   name: string
   sect: string
@@ -90,6 +101,8 @@ export interface Player {
   exp: number
   equipped: Record<EquipSlot, Equipment | null>
   bag: Equipment[]
+  heroes: string[] // 已获侠客 id
+  formation: (string | null)[] // 上阵位（2 个），存侠客 id 或 null
   currentLevelId: string
   clearedLevelIds: string[]
   createdAt: number

@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { useGameStore } from '@/stores/gameStore'
-import { GRADE_LABEL } from '@/config/equipmentConfig'
+import { GRADE_LABEL, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
 import { formatStatsLine } from '@/utils/format'
-import type { EquipSlot, Equipment } from '@/types/game'
+import type { Equipment } from '@/types/game'
 
 const game = useGameStore()
 
-const slots: { slot: EquipSlot; label: string }[] = [
-  { slot: 'weapon', label: '武器' },
-  { slot: 'armor', label: '防具' },
-  { slot: 'accessory', label: '饰品' }
-]
+const slots = ALL_SLOTS.map((slot) => ({ slot, label: SLOT_LABEL[slot] }))
 
 const GRADE_COLOR: Record<string, string> = {
   white: 'text-fg',
@@ -18,7 +14,6 @@ const GRADE_COLOR: Record<string, string> = {
   blue: 'text-blue-400',
   purple: 'text-purple-400'
 }
-
 function gradeColor(eq: Equipment): string {
   return GRADE_COLOR[eq.grade] ?? 'text-fg'
 }

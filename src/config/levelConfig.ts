@@ -1,6 +1,6 @@
 import type { LevelDef, Enemy, Stats } from '@/types/game'
 
-/** 按关卡序号生成敌人，属性线性递增；BOSS 关属性翻倍 */
+/** 按全局序号生成敌人，属性线性递增；BOSS 关属性翻倍 */
 function makeEnemy(id: string, name: string, idx: number, isBoss: boolean): Enemy {
   const k = isBoss ? 2.2 : 1
   const stats: Stats = {
@@ -20,13 +20,14 @@ function makeEnemy(id: string, name: string, idx: number, isBoss: boolean): Enem
   }
 }
 
-const MOB_NAMES = ['山贼', '流寇', '野狼', '毒蛇', '山魈', '恶丐', '黑衣人', '山贼头目', '江湖恶客']
+const MOB1 = ['山贼', '流寇', '野狼', '毒蛇', '山魈', '恶丐', '黑衣人', '山贼头目', '江湖恶客']
+const MOB2 = ['黑衣杀手', '毒蛊', '瘴鬼', '蛮兵', '邪道人', '飞贼', '魔教徒', '独眼悍匪']
 
 /** 第一章：10 关 + 末关 BOSS */
-export const LEVELS: LevelDef[] = Array.from({ length: 10 }, (_, i) => {
+const CHAPTER1: LevelDef[] = Array.from({ length: 10 }, (_, i) => {
   const idx = i + 1
   const isBoss = idx === 10
-  const name = isBoss ? '黑风寨主' : MOB_NAMES[i % MOB_NAMES.length]
+  const name = isBoss ? '黑风寨主' : MOB1[i % MOB1.length]
   return {
     id: `1-${idx}`,
     chapter: 1,
@@ -36,6 +37,27 @@ export const LEVELS: LevelDef[] = Array.from({ length: 10 }, (_, i) => {
     isBoss
   }
 })
+
+/** 第二章：10 关 + 末关 BOSS，部分关多敌人 */
+const CHAPTER2: LevelDef[] = Array.from({ length: 10 }, (_, i) => {
+  const idx = 10 + i + 1 // 全局序号 11-20
+  const isBoss = i === 9
+  const count = !isBoss && (i + 1) % 3 === 0 ? 2 : 1
+  const baseName = isBoss ? '魔教长老' : MOB2[i % MOB2.length]
+  const enemies = Array.from({ length: count }, (_, j) =>
+    makeEnemy(`e2-${idx}-${j}`, count > 1 ? `${baseName}·${j + 1}` : baseName, idx, isBoss)
+  )
+  return {
+    id: `2-${i + 1}`,
+    chapter: 2,
+    index: i + 1,
+    name: `第二章 第${i + 1}关`,
+    enemies,
+    isBoss
+  }
+})
+
+export const LEVELS: LevelDef[] = [...CHAPTER1, ...CHAPTER2]
 
 export const FIRST_LEVEL_ID = '1-1'
 

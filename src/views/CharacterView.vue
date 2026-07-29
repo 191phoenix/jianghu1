@@ -11,6 +11,7 @@ import { WEAPON_TYPE_LABEL, WEAPON_TYPE_SHAPE } from '@/logic/battleLogic'
 import { statLabel, formatStatValue } from '@/utils/format'
 import type { Stats } from '@/types/game'
 import SaveManager from '@/components/SaveManager.vue'
+import SectSkillTree from '@/components/SectSkillTree.vue'
 
 const game = useGameStore()
 const nameInput = ref(game.player.name)
@@ -80,10 +81,19 @@ function saveName() {
           <div class="text-xs text-primary">
             兵器：{{ WEAPON_TYPE_LABEL[s.weaponType] }}（{{ WEAPON_TYPE_SHAPE[s.weaponType] }}）
           </div>
-          <div class="mt-0.5 text-xs text-gold">【{{ s.skill.name }}】{{ s.skill.desc }}</div>
           <div class="text-xs text-gold">心法：{{ s.inner.name }}（{{ s.inner.desc }}）</div>
         </div>
       </div>
+
+      <h3 class="mb-1 mt-3 text-gold">武学（{{ game.sectInfo.name }}）</h3>
+      <SectSkillTree
+        :sect-id="game.player.sect"
+        :levels="game.player.sectSkillLevels"
+        :active="game.player.activeSectSkill"
+        :silver="game.player.silver"
+        @levelup="game.levelUpSectSkill"
+        @setactive="(sid) => sid && game.setActiveSectSkill(sid)"
+      />
     </div>
 
     <div class="rounded-lg border border-border bg-surface p-4">

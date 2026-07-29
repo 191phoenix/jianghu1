@@ -68,12 +68,24 @@ export interface SectInner {
   stats: Partial<Stats>
 }
 
+/** 门派武学树节点 */
+export interface SectSkill {
+  id: string // 全局唯一，如 'huashan-base'
+  name: string
+  desc: string
+  tier: number // 1=基础，2=进阶
+  prereq: { skillId: string; level: number } | null // 习得所需前置武功及其等级
+  maxLevel: number
+  multiplier: number // Lv.1 时的技能倍率
+  cdN: number // 每 n 回合触发
+}
+
 /** 门派 */
 export interface Sect {
   id: string
   name: string
   desc: string
-  skill: SkillDef
+  skills: SectSkill[] // 武学树（1 基础 + 多进阶）
   weaponType: WeaponType
   inner: SectInner
 }
@@ -217,7 +229,10 @@ export interface Player {
   shopItems: Equipment[] // 商店装备摊
   purchasedShopGear: string[] // 已购招牌装备 id
   heroSects: Record<string, string> // 侠客 id -> 门派 id（拜入门派）
-  heroUseSectSkill: Record<string, boolean> // 侠客 id -> 是否用门派武功（缺省 true）
+  heroSectSkillLevels: Record<string, Record<string, number>> // 侠客 id -> 武功 id -> 等级
+  heroActiveSectSkill: Record<string, string | null> // 侠客 id -> 主动武功 id（null=自带武功）
+  sectSkillLevels: Record<string, number> // 主角 武功 id -> 等级（0/缺省=未习得）
+  activeSectSkill: string | null // 主角主动武功 id
   tasksClaimed: string[] // 已领奖的任务 id
   currentLevelId: string
   clearedLevelIds: string[]

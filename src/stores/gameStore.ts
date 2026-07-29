@@ -11,6 +11,7 @@ import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost } from '@/logic
 import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext, getHero, emptyHeroEquipped } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
+import { SKILL_LEVEL_COST, baseSkillOf, prereqMet, effectiveSectSkill } from '@/logic/sectSkillLogic'
 import { settleOffline } from '@/logic/offlineLogic'
 import { useBattleStore } from './battleStore'
 import { usePathStore } from './pathStore'
@@ -42,7 +43,10 @@ function defaultPlayer(): Player {
     shopItems: [],
     purchasedShopGear: [],
     heroSects: {},
-    heroUseSectSkill: {},
+    heroSectSkillLevels: {},
+    heroActiveSectSkill: {},
+    sectSkillLevels: {},
+    activeSectSkill: null,
     tasksClaimed: [],
     currentLevelId: FIRST_LEVEL_ID,
     clearedLevelIds: [],
@@ -134,7 +138,10 @@ export const useGameStore = defineStore('game', {
         shopItems: p.shopItems ?? d.shopItems,
         purchasedShopGear: p.purchasedShopGear ?? d.purchasedShopGear,
         heroSects: p.heroSects ?? d.heroSects,
-        heroUseSectSkill: p.heroUseSectSkill ?? d.heroUseSectSkill,
+        heroSectSkillLevels: p.heroSectSkillLevels ?? d.heroSectSkillLevels,
+        heroActiveSectSkill: p.heroActiveSectSkill ?? d.heroActiveSectSkill,
+        sectSkillLevels: p.sectSkillLevels ?? d.sectSkillLevels,
+        activeSectSkill: p.activeSectSkill ?? d.activeSectSkill,
         tasksClaimed: p.tasksClaimed ?? d.tasksClaimed,
         currentLevelId: p.currentLevelId ?? d.currentLevelId,
         clearedLevelIds: p.clearedLevelIds ?? d.clearedLevelIds,
@@ -147,6 +154,38 @@ export const useGameStore = defineStore('game', {
         for (const slot of ALL_SLOTS) ensureStar(this.player.heroEquipped[id][slot])
       }
       for (const eq of this.player.shopItems) ensureStar(eq)
+      this.ensureSectSkills()
+    },
+
+    /** 保底：主角与已拜门派侠客的基础武功 Lv.1，且主动武功有效 */
+    ensureSectSkills() {
+      const mainSect = SECTS[this.player.sect]
+      if (mainSect) {
+        const base = baseSkillOf(mainSect)
+        if (base) {
+          if ((this.player.sectSkillLevels[base.id] || 0) < 1) this.player.sectSkillLevels[base.id] = 1
+          const cur = this.player.activeSectSkill
+          const valid =
+            !!cur && (this.player.sectSkillLevels[cur] || 0) >= 1 && mainSect.skills.some((s) => s.id === cur)
+          if (!valid) this.player.activeSectSkill = base.id
+        }
+      }
+      for (const heroId in this.player.heroSects) {
+        const sect = SECTS[this.player.heroSects[heroId]]
+        if (!sect) continue
+        const base = baseSkillOf(sect)
+        if (!base) continue
+        if (!this.player.heroSectSkillLevels[heroId]) this.player.heroSectSkillLevels[heroId] = {}
+        const levels = this.player.heroSectSkillLevels[heroId]
+        if ((levels[base.id] || 0) < 1) levels[base.id] = 1
+        const curRaw = this.player.heroActiveSectSkill[heroId]
+        if (curRaw === undefined) {
+          this.player.heroActiveSectSkill[heroId] = base.id // 缺省/旧存档 -> 用基础武功
+        } else if (curRaw !== null) {
+          const valid = (levels[curRaw] || 0) >= 1 && sect.skills.some((s) => s.id === curRaw)
+          if (!valid) this.player.heroActiveSectSkill[heroId] = base.id
+        }
+      }
     },
 
     setPlayerName(name: string) {
@@ -154,10 +193,10 @@ export const useGameStore = defineStore('game', {
     },
 
     changeSect(sectId: string) {
-      if (SECTS[sectId]) {
-        this.player.sect = sectId
-        this.touchSave()
-      }
+      if (!SECTS[sectId]) return
+      this.player.sect = sectId
+      this.ensureSectSkills()
+      this.touchSave()
     },
 
     setFormation(slotIdx: number, heroId: string | null) {
@@ -228,23 +267,82 @@ export const useGameStore = defineStore('game', {
       this.touchSave()
     },
 
-    /** 侠客拜入/退出门派（退出则同步清除武功开关） */
+    /** 侠客拜入/退出门派（拜入保底基础武功 Lv.1 + 主动=基础；退出主动置 null=自带武功） */
     setHeroSect(heroId: string, sectId: string | null) {
       if (!this.player.heroes.includes(heroId)) return
       if (sectId === null) {
         delete this.player.heroSects[heroId]
-        delete this.player.heroUseSectSkill[heroId]
+        this.player.heroActiveSectSkill[heroId] = null
       } else {
         if (!SECTS[sectId]) return
         this.player.heroSects[heroId] = sectId
+        if (!this.player.heroSectSkillLevels[heroId]) this.player.heroSectSkillLevels[heroId] = {}
+        const base = baseSkillOf(SECTS[sectId])
+        if (base) {
+          if ((this.player.heroSectSkillLevels[heroId][base.id] || 0) < 1) {
+            this.player.heroSectSkillLevels[heroId][base.id] = 1
+          }
+          this.player.heroActiveSectSkill[heroId] = base.id
+        }
       }
       this.touchSave()
     },
 
-    /** 切换侠客武功来源：门派武功 <-> 自带武功 */
-    toggleHeroSectSkill(heroId: string) {
-      if (!this.player.heroSects[heroId]) return
-      this.player.heroUseSectSkill[heroId] = this.player.heroUseSectSkill[heroId] === false
+    /** 校验并升级某武功一级（共享逻辑，返回是否成功） */
+    tryLevelUp(levels: Record<string, number>, sectId: string, skillId: string): boolean {
+      const sect = SECTS[sectId]
+      const node = sect?.skills.find((s) => s.id === skillId)
+      if (!node) return false
+      const cur = levels[skillId] || 0
+      if (cur >= node.maxLevel) return false
+      if (cur === 0 && !prereqMet(node, levels)) return false // 习得需前置达标
+      const cost = SKILL_LEVEL_COST(cur)
+      if (this.player.silver < cost) return false
+      this.player.silver -= cost
+      levels[skillId] = cur + 1
+      return true
+    },
+
+    /** 主角：升级门派武功 */
+    levelUpSectSkill(skillId: string) {
+      if (this.tryLevelUp(this.player.sectSkillLevels, this.player.sect, skillId)) {
+        this.touchSave()
+      }
+    },
+
+    /** 侠客：升级门派武功 */
+    levelUpHeroSectSkill(heroId: string, skillId: string) {
+      const sectId = this.player.heroSects[heroId]
+      if (!sectId) return
+      if (!this.player.heroSectSkillLevels[heroId]) this.player.heroSectSkillLevels[heroId] = {}
+      if (this.tryLevelUp(this.player.heroSectSkillLevels[heroId], sectId, skillId)) {
+        this.touchSave()
+      }
+    },
+
+    /** 主角：设主动武功（须已习得） */
+    setActiveSectSkill(skillId: string) {
+      const sect = SECTS[this.player.sect]
+      if (!sect) return
+      if ((this.player.sectSkillLevels[skillId] || 0) < 1) return
+      if (!sect.skills.some((s) => s.id === skillId)) return
+      this.player.activeSectSkill = skillId
+      this.touchSave()
+    },
+
+    /** 侠客：设主动武功（null=自带武功，skillId 须已习得） */
+    setHeroActiveSectSkill(heroId: string, skillId: string | null) {
+      if (skillId === null) {
+        this.player.heroActiveSectSkill[heroId] = null
+        this.touchSave()
+        return
+      }
+      const sectId = this.player.heroSects[heroId]
+      const sect = sectId ? SECTS[sectId] : null
+      if (!sect) return
+      if ((this.player.heroSectSkillLevels[heroId]?.[skillId] || 0) < 1) return
+      if (!sect.skills.some((s) => s.id === skillId)) return
+      this.player.heroActiveSectSkill[heroId] = skillId
       this.touchSave()
     },
 
@@ -453,11 +551,16 @@ export const useGameStore = defineStore('game', {
     /** 构造单个我方 AllyInput：key = 'main' 或侠客 id */
     buildAlly(key: string, pos: number): AllyInput {
       if (key === 'main') {
+        const sect = this.sectInfo
+        const base = baseSkillOf(sect)
+        const skill =
+          effectiveSectSkill(sect, this.player.activeSectSkill, this.player.sectSkillLevels) ??
+          (base ? effectiveSectSkill(sect, base.id, this.player.sectSkillLevels) : null)
         return {
           name: this.player.name,
           stats: computePlayerStats(this.player),
-          skill: this.sectInfo.skill,
-          weaponType: this.sectInfo.weaponType,
+          skill,
+          weaponType: sect.weaponType,
           pos
         }
       }
@@ -466,13 +569,15 @@ export const useGameStore = defineStore('game', {
       const eq = this.player.heroEquipped[key] || emptyHeroEquipped()
       const sectId = this.player.heroSects[key] || null
       const sect = sectId ? SECTS[sectId] : null
-      const useSectSkill = !!sect && this.player.heroUseSectSkill[key] !== false
+      const heroLevels = this.player.heroSectSkillLevels[key] || {}
+      const activeSkillId = this.player.heroActiveSectSkill[key] ?? null
+      const sectSkill = sect ? effectiveSectSkill(sect, activeSkillId, heroLevels) : null
       return {
         name: h ? h.name : key,
         stats: h
           ? computeHeroStats(h, lvl, eq, sectId)
           : { hp: 1, atk: 1, def: 0, spd: 1, critRate: 0, critDmg: 1 },
-        skill: h ? (useSectSkill && sect ? sect.skill : h.skill) : null,
+        skill: h ? (sectSkill ?? h.skill) : null,
         weaponType: h ? h.weaponType : 'fist',
         pos
       }

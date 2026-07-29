@@ -12,6 +12,7 @@ npm-debug.log*
 
 # Editor / OS
 .DS_Store
+.claude/
 .vscode/*
 !.vscode/extensions.json
 .idea

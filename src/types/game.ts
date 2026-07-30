@@ -204,6 +204,7 @@ export interface OfflineReward {
   exp: number
   drops: Equipment[]
   stones: number
+  silver: number
   levelId: string
 }
 

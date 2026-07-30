@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
-import { GRADE_LABEL, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
-import { enhanceCost, MAX_STAR, effectiveStats, decomposeValue } from '@/logic/equipmentLogic'
+import { GRADE_LABEL, GRADE_ORDER, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
+import { enhanceCost, MAX_STAR, effectiveStats, decomposeValue, sellValue } from '@/logic/equipmentLogic'
 import { WEAPON_TYPE_LABEL } from '@/logic/battleLogic'
 import { formatStatsLine } from '@/utils/format'
-import type { Equipment } from '@/types/game'
+import type { Equipment, EquipGrade } from '@/types/game'
 
 const game = useGameStore()
 
@@ -21,6 +22,27 @@ function gradeColor(eq: Equipment): string {
 }
 function canEnhance(eq: Equipment): boolean {
   return eq.star < MAX_STAR && game.player.stones >= enhanceCost(eq.star)
+}
+
+// 批量处理：按品阶筛选后一键出售/分解
+const batchGrade = ref<EquipGrade>('white')
+const batchMatches = computed(() => game.player.bag.filter((e) => e.grade === batchGrade.value))
+const batchSellTotal = computed(() => batchMatches.value.reduce((s, e) => s + sellValue(e), 0))
+const batchDecompTotal = computed(() => batchMatches.value.reduce((s, e) => s + decomposeValue(e), 0))
+function countByGrade(g: EquipGrade): number {
+  return game.player.bag.filter((e) => e.grade === g).length
+}
+function doBatchSell() {
+  const n = batchMatches.value.length
+  if (!n) return
+  if (!confirm(`出售 ${n} 件${GRADE_LABEL[batchGrade.value]}品装备，获得 ${batchSellTotal.value} 银两？`)) return
+  game.batchSellByGrade(batchGrade.value)
+}
+function doBatchDecompose() {
+  const n = batchMatches.value.length
+  if (!n) return
+  if (!confirm(`分解 ${n} 件${GRADE_LABEL[batchGrade.value]}品装备，获得 ${batchDecompTotal.value} 强化石？`)) return
+  game.batchDecomposeByGrade(batchGrade.value)
 }
 </script>
 
@@ -89,6 +111,12 @@ function canEnhance(eq: Equipment): boolean {
               强化
             </button>
             <button
+              class="rounded border border-primary px-2 py-0.5 text-xs text-primary"
+              @click="game.sellEquipment(eq.id)"
+            >
+              售+{{ sellValue(eq) }}
+            </button>
+            <button
               class="rounded border border-border px-2 py-0.5 text-xs text-muted"
               @click="game.decomposeEquipment(eq.id)"
             >
@@ -96,6 +124,40 @@ function canEnhance(eq: Equipment): boolean {
             </button>
           </span>
         </div>
+      </div>
+    </div>
+
+    <div class="rounded-lg border border-border bg-surface p-4">
+      <h2 class="mb-2 text-gold">批量处理</h2>
+      <div class="mb-2 flex flex-wrap gap-1">
+        <button
+          v-for="g in GRADE_ORDER"
+          :key="g"
+          :class="batchGrade === g ? 'border border-gold bg-bg text-gold' : 'border border-border text-muted'"
+          class="rounded px-2 py-1 text-xs"
+          @click="batchGrade = g"
+        >
+          {{ GRADE_LABEL[g] }}品({{ countByGrade(g) }})
+        </button>
+      </div>
+      <div class="text-xs text-muted">
+        已选 {{ batchMatches.length }} 件 · 出售可得 {{ batchSellTotal }} 银两 · 分解可得 {{ batchDecompTotal }} 强化石
+      </div>
+      <div class="mt-2 flex gap-2">
+        <button
+          class="rounded bg-primary px-3 py-1 text-xs text-primary-fg disabled:opacity-30"
+          :disabled="!batchMatches.length"
+          @click="doBatchSell"
+        >
+          批量出售
+        </button>
+        <button
+          class="rounded border border-gold px-3 py-1 text-xs text-gold disabled:opacity-30"
+          :disabled="!batchMatches.length"
+          @click="doBatchDecompose"
+        >
+          批量分解
+        </button>
       </div>
     </div>
   </div>

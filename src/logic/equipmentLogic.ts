@@ -57,6 +57,17 @@ export function decomposeValue(eq: Equipment): number {
   return GRADE_DECOMPOSE[eq.grade] + (eq.star || 0)
 }
 
+/** 出售装备所得银两 = 品阶基础值 + 已投入星数×10（约为商店买价 4 成） */
+const GRADE_SELL: Record<EquipGrade, number> = {
+  white: 20,
+  green: 50,
+  blue: 100,
+  purple: 200
+}
+export function sellValue(eq: Equipment): number {
+  return GRADE_SELL[eq.grade] + (eq.star || 0) * 10
+}
+
 /** 击败敌人后掉落的强化石数量 */
 export function rollStones(enemy: Enemy): number {
   if (enemy.dropRate >= 0.9) return 3 + Math.floor(Math.random() * 3) // BOSS 必掉 3-5

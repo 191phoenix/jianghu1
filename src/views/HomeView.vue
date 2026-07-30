@@ -36,6 +36,9 @@ const game = useGameStore()
         离线 {{ Math.floor(game.pendingOffline.duration / 60) }} 分钟，扫荡已通关卡
       </p>
       <p class="text-sm text-fg">经验 +{{ game.pendingOffline.exp }}</p>
+      <p v-if="game.pendingOffline.silver" class="text-sm text-fg">
+        银两 +{{ game.pendingOffline.silver }}
+      </p>
       <p v-if="game.pendingOffline.stones" class="text-sm text-fg">
         强化石 +{{ game.pendingOffline.stones }}
       </p>

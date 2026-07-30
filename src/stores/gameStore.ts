@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { Player, BattleResult, Equipment, EquipSlot, OfflineReward, Sect, Enemy, PathReward } from '@/types/game'
+import type { Player, BattleResult, Equipment, EquipSlot, EquipGrade, OfflineReward, Sect, Enemy, PathReward } from '@/types/game'
 import { DEFAULT_SECT, SECTS } from '@/config/sectConfig'
 import { FIRST_LEVEL_ID, getLevel, nextLevelId } from '@/config/levelConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
@@ -7,7 +7,7 @@ import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE, SHOP_GEAR } from '@/config/sho
 import { computePlayerStats } from '@/logic/statsLogic'
 import type { AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
-import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost, decomposeValue } from '@/logic/equipmentLogic'
+import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost, decomposeValue, sellValue } from '@/logic/equipmentLogic'
 import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext, getHero, emptyHeroEquipped } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
@@ -268,6 +268,34 @@ export const useGameStore = defineStore('game', {
       const eq = this.player.bag[idx]
       this.player.stones += decomposeValue(eq)
       this.player.bag.splice(idx, 1)
+      this.touchSave()
+    },
+
+    /** 出售背包中的装备换银两（品阶基础值 + 已投入星数×10） */
+    sellEquipment(eqId: string) {
+      const idx = this.player.bag.findIndex((e) => e.id === eqId)
+      if (idx < 0) return
+      const eq = this.player.bag[idx]
+      this.player.silver += sellValue(eq)
+      this.player.bag.splice(idx, 1)
+      this.touchSave()
+    },
+
+    /** 批量出售背包中指定品阶的装备 */
+    batchSellByGrade(grade: EquipGrade) {
+      const matches = this.player.bag.filter((e) => e.grade === grade)
+      if (matches.length === 0) return
+      this.player.silver += matches.reduce((s, e) => s + sellValue(e), 0)
+      this.player.bag = this.player.bag.filter((e) => e.grade !== grade)
+      this.touchSave()
+    },
+
+    /** 批量分解背包中指定品阶的装备 */
+    batchDecomposeByGrade(grade: EquipGrade) {
+      const matches = this.player.bag.filter((e) => e.grade === grade)
+      if (matches.length === 0) return
+      this.player.stones += matches.reduce((s, e) => s + decomposeValue(e), 0)
+      this.player.bag = this.player.bag.filter((e) => e.grade !== grade)
       this.touchSave()
     },
 
@@ -729,6 +757,7 @@ export const useGameStore = defineStore('game', {
       }
       this.player.bag.push(...r.drops)
       this.player.stones += r.stones
+      this.player.silver += r.silver
       this.pendingOffline = null
       this.touchSave()
     }

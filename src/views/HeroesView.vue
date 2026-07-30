@@ -7,6 +7,7 @@ import { computeHeroStats, heroExpToNext, emptyHeroEquipped } from '@/logic/hero
 import { effectiveSectSkill } from '@/logic/sectSkillLogic'
 import { GRADE_LABEL, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
 import { WEAPON_TYPE_LABEL, WEAPON_TYPE_SHAPE } from '@/logic/battleLogic'
+import { effectiveStats } from '@/logic/equipmentLogic'
 import { formatStatsLine } from '@/utils/format'
 import type { Hero, EquipSlot, SkillDef } from '@/types/game'
 import SectSkillTree from '@/components/SectSkillTree.vue'
@@ -182,8 +183,11 @@ function unequip(heroId: string, slot: EquipSlot) {
             <span class="text-fg">
               <span :class="gradeColor(eq)">{{ eq.name }}</span>
               <span class="text-gold">★{{ eq.star }}</span>
+              <span v-if="eq.weaponType" class="ml-0.5 text-primary">
+                [{{ WEAPON_TYPE_LABEL[eq.weaponType] }}]
+              </span>
               <span class="ml-1 text-muted">({{ GRADE_LABEL[eq.grade] }})</span>
-              <span class="ml-2 text-muted">{{ formatStatsLine(eq.stats) }}</span>
+              <span class="ml-2 text-muted">{{ formatStatsLine(effectiveStats(eq)) }}</span>
             </span>
             <button class="text-primary underline" @click="pickEq(h.id, eq.id)">
               穿

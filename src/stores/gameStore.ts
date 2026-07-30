@@ -7,7 +7,7 @@ import { EQUIP_PRICE, STONE_PRICE, REFRESH_PRICE, SHOP_GEAR } from '@/config/sho
 import { computePlayerStats } from '@/logic/statsLogic'
 import type { AllyInput } from '@/logic/battleLogic'
 import { expToNext } from '@/logic/growthLogic'
-import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost } from '@/logic/equipmentLogic'
+import { rollDrop, rollStones, rollSilver, MAX_STAR, enhanceCost, decomposeValue } from '@/logic/equipmentLogic'
 import { formationHeroes, heroesToAcquire, computeHeroStats, heroExpToNext, getHero, emptyHeroEquipped } from '@/logic/heroLogic'
 import { talentBonus, availableTalentPoints } from '@/logic/talentLogic'
 import { innerSkillsToAcquire } from '@/logic/innerSkillLogic'
@@ -57,6 +57,11 @@ function defaultPlayer(): Player {
 
 function ensureStar(eq: Equipment | null): void {
   if (eq && eq.star === undefined) eq.star = 0
+}
+
+/** 旧存档的武器没有 weaponType，默认为剑 */
+function ensureWeaponType(eq: Equipment | null): void {
+  if (eq && eq.slot === 'weapon' && !eq.weaponType) eq.weaponType = 'sword'
 }
 
 /** 迁移旧版侠客装备到 6 槽记录（旧版每侠客单件 Equipment） */
@@ -148,12 +153,24 @@ export const useGameStore = defineStore('game', {
         createdAt: p.createdAt || Date.now(),
         lastActiveTime: p.lastActiveTime || Date.now()
       }
-      for (const eq of this.player.bag) ensureStar(eq)
-      for (const slot of ALL_SLOTS) ensureStar(this.player.equipped[slot])
-      for (const id in this.player.heroEquipped) {
-        for (const slot of ALL_SLOTS) ensureStar(this.player.heroEquipped[id][slot])
+      for (const eq of this.player.bag) {
+        ensureStar(eq)
+        ensureWeaponType(eq)
       }
-      for (const eq of this.player.shopItems) ensureStar(eq)
+      for (const slot of ALL_SLOTS) {
+        ensureStar(this.player.equipped[slot])
+        ensureWeaponType(this.player.equipped[slot])
+      }
+      for (const id in this.player.heroEquipped) {
+        for (const slot of ALL_SLOTS) {
+          ensureStar(this.player.heroEquipped[id][slot])
+          ensureWeaponType(this.player.heroEquipped[id][slot])
+        }
+      }
+      for (const eq of this.player.shopItems) {
+        ensureStar(eq)
+        ensureWeaponType(eq)
+      }
       this.ensureSectSkills()
     },
 
@@ -241,6 +258,16 @@ export const useGameStore = defineStore('game', {
       this.player.stones -= cost
       eq.star++
       this.player.enhanceCount++
+      this.touchSave()
+    },
+
+    /** 分解背包中的多余装备为强化石（品阶基础值 + 已投入星数） */
+    decomposeEquipment(eqId: string) {
+      const idx = this.player.bag.findIndex((e) => e.id === eqId)
+      if (idx < 0) return
+      const eq = this.player.bag[idx]
+      this.player.stones += decomposeValue(eq)
+      this.player.bag.splice(idx, 1)
       this.touchSave()
     },
 
@@ -644,7 +671,8 @@ export const useGameStore = defineStore('game', {
         slot: gear.slot,
         grade: gear.grade,
         stats: { ...gear.stats },
-        star: 0
+        star: 0,
+        ...(gear.weaponType ? { weaponType: gear.weaponType } : {})
       })
       this.player.purchasedShopGear.push(gearId)
       this.touchSave()

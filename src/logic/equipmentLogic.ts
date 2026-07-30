@@ -1,4 +1,4 @@
-import type { Enemy, Equipment } from '@/types/game'
+import type { Enemy, Equipment, Stats, EquipGrade } from '@/types/game'
 import { rollEquipment, randomDropGrade, ALL_SLOTS } from '@/config/equipmentConfig'
 import { genId } from '@/utils/id'
 
@@ -12,9 +12,49 @@ export function rollDrop(enemy: Enemy, levelIdx: number): Equipment | null {
 
 export const MAX_STAR = 5
 
+/** 每强化 1 星的属性倍率 */
+export const STAR_BONUS_PER_STAR = 0.2
+
+/**
+ * 单条属性经强化后的值：
+ * - 整数属性（hp/atk/def/spd）：按倍率放大，但保证每星至少 +1（避免低基础值被取整吞掉，强化肉眼可见）；
+ *   高基础值仍走倍率，5 星最高 2 倍。
+ * - 百分比属性（critRate/critDmg）：按倍率放大，保留 2 位小数。
+ */
+export function enhancedStatValue(key: keyof Stats, base: number, star: number): number {
+  const s = star || 0
+  if (key === 'critRate' || key === 'critDmg') {
+    return Math.round(base * (1 + s * STAR_BONUS_PER_STAR) * 100) / 100
+  }
+  const byMult = base * (1 + s * STAR_BONUS_PER_STAR)
+  const byFloor = base + s // 保底：每星至少 +1
+  return Math.floor(Math.max(byMult, byFloor))
+}
+
 /** 强化到下一星所需的强化石 = 当前星数 + 1 */
 export function enhanceCost(currentStar: number): number {
   return currentStar + 1
+}
+
+/** 装备经强化后的实际属性（用于展示） */
+export function effectiveStats(eq: Equipment): Partial<Stats> {
+  const out: Partial<Stats> = {}
+  for (const k in eq.stats) {
+    const key = k as keyof Stats
+    out[key] = enhancedStatValue(key, eq.stats[key] ?? 0, eq.star)
+  }
+  return out
+}
+
+/** 分解装备所得强化石 = 品阶基础值 + 已投入星数 */
+const GRADE_DECOMPOSE: Record<EquipGrade, number> = {
+  white: 1,
+  green: 2,
+  blue: 4,
+  purple: 7
+}
+export function decomposeValue(eq: Equipment): number {
+  return GRADE_DECOMPOSE[eq.grade] + (eq.star || 0)
 }
 
 /** 击败敌人后掉落的强化石数量 */

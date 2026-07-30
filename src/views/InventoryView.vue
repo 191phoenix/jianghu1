@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useGameStore } from '@/stores/gameStore'
 import { GRADE_LABEL, ALL_SLOTS, SLOT_LABEL } from '@/config/equipmentConfig'
-import { enhanceCost, MAX_STAR } from '@/logic/equipmentLogic'
+import { enhanceCost, MAX_STAR, effectiveStats, decomposeValue } from '@/logic/equipmentLogic'
+import { WEAPON_TYPE_LABEL } from '@/logic/battleLogic'
 import { formatStatsLine } from '@/utils/format'
 import type { Equipment } from '@/types/game'
 
@@ -38,8 +39,11 @@ function canEnhance(eq: Equipment): boolean {
               {{ game.player.equipped[s.slot]!.name }}
               <span class="text-gold">★{{ game.player.equipped[s.slot]!.star }}</span>
             </div>
+            <div v-if="game.player.equipped[s.slot]!.weaponType" class="text-[10px] text-primary">
+              {{ WEAPON_TYPE_LABEL[game.player.equipped[s.slot]!.weaponType!] }}
+            </div>
             <div class="text-xs text-muted">
-              {{ formatStatsLine(game.player.equipped[s.slot]!.stats) }}
+              {{ formatStatsLine(effectiveStats(game.player.equipped[s.slot]!)) }}
             </div>
             <div class="mt-1 flex justify-center gap-2 text-xs">
               <button class="text-primary underline" @click="game.unequip(s.slot)">卸下</button>
@@ -69,8 +73,11 @@ function canEnhance(eq: Equipment): boolean {
           <span>
             <span :class="gradeColor(eq)">{{ eq.name }}</span>
             <span class="text-gold">★{{ eq.star }}</span>
+            <span v-if="eq.weaponType" class="ml-0.5 text-xs text-primary">
+              [{{ WEAPON_TYPE_LABEL[eq.weaponType] }}]
+            </span>
             <span class="ml-1 text-xs text-muted">({{ GRADE_LABEL[eq.grade] }})</span>
-            <span class="ml-2 text-xs text-muted">{{ formatStatsLine(eq.stats) }}</span>
+            <span class="ml-2 text-xs text-muted">{{ formatStatsLine(effectiveStats(eq)) }}</span>
           </span>
           <span class="flex gap-1">
             <button class="rounded bg-primary px-2 py-0.5 text-xs text-primary-fg" @click="game.equipItem(eq.id)">穿</button>
@@ -80,6 +87,12 @@ function canEnhance(eq: Equipment): boolean {
               @click="game.enhanceEquipment(eq.id)"
             >
               强化
+            </button>
+            <button
+              class="rounded border border-border px-2 py-0.5 text-xs text-muted"
+              @click="game.decomposeEquipment(eq.id)"
+            >
+              分解+{{ decomposeValue(eq) }}
             </button>
           </span>
         </div>

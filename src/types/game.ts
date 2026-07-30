@@ -21,6 +21,7 @@ export interface Equipment {
   grade: EquipGrade
   stats: Partial<Stats>
   star: number // 0-5 强化星数
+  weaponType?: WeaponType // 仅武器部位有：决定名称与属性倾向（不影响战斗形状）
 }
 
 /** 商店招牌装备（固定目录，一次性购买） */
@@ -31,6 +32,7 @@ export interface ShopGearDef {
   grade: EquipGrade
   stats: Partial<Stats>
   price: number
+  weaponType?: WeaponType
 }
 
 /** 敌人 */

@@ -1,5 +1,6 @@
 import type { Player, Stats } from '@/types/game'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
+import { enhancedStatValue } from './equipmentLogic'
 import { talentBonus } from './talentLogic'
 import { innerSkillBonus, sectInnerBonus } from './innerSkillLogic'
 
@@ -24,14 +25,13 @@ export function baseStatsByLevel(level: number): Stats {
 export function computePlayerStats(player: Player): Stats {
   const total = { ...baseStatsByLevel(player.level) }
 
-  // 装备，按 star 放大（每星 +15%）
+  // 装备，按 star 放大（每星至少 +1，保证强化可见）
   for (const slot of ALL_SLOTS) {
     const eq = player.equipped[slot]
     if (eq) {
-      const mult = 1 + (eq.star || 0) * 0.15
       for (const k in eq.stats) {
         const key = k as keyof Stats
-        total[key] += (eq.stats[key] ?? 0) * mult
+        total[key] += enhancedStatValue(key, eq.stats[key] ?? 0, eq.star)
       }
     }
   }

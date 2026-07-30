@@ -1,6 +1,7 @@
 import type { Hero, Player, Stats, Equipment, EquipSlot } from '@/types/game'
 import { HEROES, getHero } from '@/config/heroConfig'
 import { ALL_SLOTS } from '@/config/equipmentConfig'
+import { enhancedStatValue } from './equipmentLogic'
 import { sectInnerBonus } from './innerSkillLogic'
 
 export { getHero, HEROES }
@@ -41,10 +42,9 @@ export function computeHeroStats(
   for (const slot of ALL_SLOTS) {
     const eq = equipped[slot]
     if (!eq) continue
-    const mult = 1 + (eq.star || 0) * 0.15
     for (const k in eq.stats) {
       const key = k as keyof Stats
-      stats[key] += (eq.stats[key] ?? 0) * mult
+      stats[key] += enhancedStatValue(key, eq.stats[key] ?? 0, eq.star)
     }
   }
   const sb = sectInnerBonus(sectId)
